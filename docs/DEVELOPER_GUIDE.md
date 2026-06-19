@@ -523,7 +523,7 @@ The fix is a second collector, same wire contract, browser-shaped:
   label captured at call time. An `onSnapshot` registered inside `bucket()` keeps
   that name for every future fire.
 - **Reporting.** Same `Sink`/wire shape as the server. Two browser-forced changes:
-  it authenticates with a **publishable** key (`cd_pk_` — a secret can't live in
+  it authenticates with a **publishable** key (`cd_pub_live_` — a secret can't live in
   client code; the ingest accepts publishable keys for Buckets reports exactly as
   the analytics SDK does for events), and it flushes on `visibilitychange→hidden` /
   `pagehide` via `fetch(keepalive)` so the last window survives the tab closing.

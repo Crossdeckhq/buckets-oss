@@ -10,7 +10,7 @@
  *   import { initBucketsWeb, bucket } from "@cross-deck/buckets/web";
  *   import { getDoc, getDocs, onSnapshot } from "@cross-deck/buckets/web"; // was "firebase/firestore"
  *
- *   initBucketsWeb({ apiKey: "cd_pk_…" }); // your PUBLISHABLE key
+ *   initBucketsWeb({ apiKey: "cd_pub_live_…" }); // your PUBLISHABLE key
  *
  *   bucket("pulse-map", () => onSnapshot(liveQuery, render));
  *
@@ -22,7 +22,7 @@ import { configureWebMeter, flushWeb, type WebMeterConfig } from "./meter";
 import { WebReportSink } from "./sink";
 
 export interface InitWebOptions {
-  /** The project's `cd_pk_` PUBLISHABLE key (safe in client code). */
+  /** The project's `cd_pub_live_` PUBLISHABLE key (safe in client code). */
   apiKey: string;
   /** Override the report endpoint (defaults to Crossdeck's ingest). */
   endpoint?: string;

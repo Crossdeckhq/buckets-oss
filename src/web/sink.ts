@@ -2,7 +2,7 @@
  * web/sink — reports the browser's coalesced rollup up to Crossdeck's ingest.
  *
  * Two differences from the Node sink, both forced by the browser:
- *  - it authenticates with a PUBLISHABLE key (`cd_pk_`), never a secret — a
+ *  - it authenticates with a PUBLISHABLE key (`cd_pub_live_`), never a secret — a
  *    secret key cannot live in client code. (The ingest accepts publishable keys
  *    for Buckets reports the same way the analytics SDK accepts them for events.)
  *  - it uses `fetch(..., { keepalive: true })` so a report fired as the tab is
@@ -15,7 +15,7 @@ import type { BucketsReport, Sink } from "../sink";
 const DEFAULT_ENDPOINT = "https://api.cross-deck.com/v1/buckets/report";
 
 export interface WebReportSinkConfig {
-  /** The project's `cd_pk_` PUBLISHABLE key. */
+  /** The project's `cd_pub_live_` PUBLISHABLE key. */
   apiKey: string;
   endpoint?: string;
 }

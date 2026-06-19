@@ -96,7 +96,7 @@ import { initBucketsWeb, bucket } from "@cross-deck/buckets/web";
 // was: import { getDocs, onSnapshot } from "firebase/firestore"
 import { getDocs, onSnapshot } from "@cross-deck/buckets/web";
 
-initBucketsWeb({ apiKey: "cd_pk_…" }); // your PUBLISHABLE key — safe in client code
+initBucketsWeb({ apiKey: "cd_pub_live_…" }); // your PUBLISHABLE key — safe in client code
 
 bucket("live-feed", () => onSnapshot(liveQuery, render)); // every fire counted
 ```
@@ -110,6 +110,14 @@ on each surface you read from, and you see all of it.
 > We learned this the hard way dogfooding on our own dashboard: 94% of our reads
 > were browser-side and a server-only install was blind to them. The browser
 > collector is the fix — and the reason "install where you read" is the whole model.
+
+**Idempotent + React-Strict-Mode safe.** `initBucketsWeb()` only points the meter
+at a sink — it never touches the count buffers (those fill from *reads*), and the
+flush timer + `visibilitychange`/`pagehide` hooks sit behind one-time guards. So
+calling it twice is harmless; init it wherever you init your other SDKs. One dev-only
+nuance: React Strict Mode double-mounts effects, so a listener's *first* fire can be
+counted twice **in dev** — production builds don't double-invoke, so your prod
+numbers are exact, and your `useEffect` cleanup tears each listener down anyway.
 
 ---
 

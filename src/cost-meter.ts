@@ -98,10 +98,17 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     if (!Number.isFinite(quantity) || quantity <= 0) return;
     const t = currentCostTag();
     const date = utcDate();
-    // CASCADE — every unit gets a label, by design (no blind spots): the bucket
-    // name wins; else the collection it actually touched (`col:posts`); else
-    // "uncategorized" as a loud last resort. A unit is never invisible.
-    const label = t.label || (hint?.collection ? `col:${hint.collection}` : "uncategorized");
+    // HIERARCHY — the bucket path is the trunk; the collection is the LEAF kept
+    // beneath it (so a tagged bucket still drills down to which collections it
+    // read). "analytics" + events → "analytics>col:events"; untagged → "col:events";
+    // nothing derivable → "uncategorized". A unit is never invisible, and a tagged
+    // one never loses where it actually went.
+    const coll = hint?.collection ? `col:${hint.collection}` : null;
+    const label = t.label
+      ? coll
+        ? `${t.label}>${coll}`
+        : t.label
+      : coll ?? "uncategorized";
     // Key includes the resource, so each resource accumulates in its OWN slot.
     const lk = date + SEP + resource + SEP + label;
     labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + quantity);

@@ -58,6 +58,14 @@ function collLabel(ref: any): string {
   return "uncategorized";
 }
 
+// The full hierarchy label: the active bucket path as trunk + the collection as
+// the LEAF beneath it (so a tagged bucket still drills into its collections).
+function labelFor(ref: any): string {
+  const b = currentLabel();
+  const c = collLabel(ref);
+  return b ? `${b}>${c}` : c;
+}
+
 function meter(label: string, n: number): void {
   try {
     recordWeb("read", n, label);

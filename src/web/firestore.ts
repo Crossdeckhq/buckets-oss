@@ -17,21 +17,25 @@
  *     (first fire = all matching docs; each update = just the changed ones —
  *     which is precisely what a listener is billed).
  */
-import {
-  getDoc as _getDoc,
-  getDocs as _getDocs,
-  onSnapshot as _onSnapshot,
-} from "firebase/firestore";
+import * as FS from "firebase/firestore";
 import { recordWeb } from "./meter";
 import { currentLabel } from "./context";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyAsync = (...args: any[]) => Promise<any>;
 
-// The real Firestore reads have many typed overloads; we pass arguments through
-// verbatim, so call them through loose aliases (the wrappers preserve behaviour).
-const rawGetDoc = _getDoc as (...args: any[]) => Promise<any>;
-const rawGetDocs = _getDocs as (...args: any[]) => Promise<any>;
-const rawOnSnapshot = _onSnapshot as (...args: any[]) => any;
+// Call the real reads through the namespace + loose aliases: a function missing on
+// an older `firebase` (e.g. getAggregateFromServer pre-v10) is simply `undefined`
+// rather than a hard import error, and the wrappers pass arguments through verbatim.
+const rawGetDoc = FS.getDoc as AnyAsync;
+const rawGetDocs = FS.getDocs as AnyAsync;
+const rawOnSnapshot = FS.onSnapshot as (...args: any[]) => any;
+const rawGetDocFromServer = (FS as any).getDocFromServer as AnyAsync | undefined;
+const rawGetDocsFromServer = (FS as any).getDocsFromServer as AnyAsync | undefined;
+const rawGetDocFromCache = (FS as any).getDocFromCache as AnyAsync | undefined;
+const rawGetDocsFromCache = (FS as any).getDocsFromCache as AnyAsync | undefined;
+const rawGetCountFromServer = (FS as any).getCountFromServer as AnyAsync | undefined;
+const rawGetAggregateFromServer = (FS as any).getAggregateFromServer as AnyAsync | undefined;
 
 /** Best-effort collection label from a ref/query. PURE; never throws. */
 function collLabel(ref: any): string {
@@ -118,4 +122,51 @@ export function onSnapshot(ref: any, ...args: any[]): any {
   }
 
   return rawOnSnapshot(ref, ...out);
+}
+
+// ── Force-from-server reads — bill exactly like getDoc / getDocs ──────────────
+export function getDocFromServer(ref: any, ...rest: any[]): Promise<any> {
+  const label = currentLabel() ?? collLabel(ref);
+  return rawGetDocFromServer!(ref, ...rest).then((snap: any) => {
+    meter(label, 1);
+    return snap;
+  });
+}
+export function getDocsFromServer(query: any, ...rest: any[]): Promise<any> {
+  const label = currentLabel() ?? collLabel(query);
+  return rawGetDocsFromServer!(query, ...rest).then((snap: any) => {
+    meter(label, typeof snap?.size === "number" ? Math.max(snap.size, 1) : 1);
+    return snap;
+  });
+}
+
+// ── Cache-only reads — NOT billed, so pass through and count NOTHING ──────────
+// (Counting these would over-report; a cache hit costs you nothing.)
+export function getDocFromCache(ref: any, ...rest: any[]): Promise<any> {
+  return rawGetDocFromCache!(ref, ...rest);
+}
+export function getDocsFromCache(query: any, ...rest: any[]): Promise<any> {
+  return rawGetDocsFromCache!(query, ...rest);
+}
+
+// ── Aggregation — count() / sum() / average() ────────────────────────────────
+// Honest estimate: ceil(count / 1000), min 1 — Firestore never exposes the exact
+// index-entry count. Same model as the server trap, so the numbers reconcile.
+function aggReads(snap: any): number {
+  const count = typeof snap?.data?.()?.count === "number" ? snap.data().count : 0;
+  return Math.max(1, Math.ceil(count / 1000));
+}
+export function getCountFromServer(query: any, ...rest: any[]): Promise<any> {
+  const label = currentLabel() ?? collLabel(query);
+  return rawGetCountFromServer!(query, ...rest).then((snap: any) => {
+    meter(label, aggReads(snap));
+    return snap;
+  });
+}
+export function getAggregateFromServer(query: any, spec: any, ...rest: any[]): Promise<any> {
+  const label = currentLabel() ?? collLabel(query);
+  return rawGetAggregateFromServer!(query, spec, ...rest).then((snap: any) => {
+    meter(label, aggReads(snap));
+    return snap;
+  });
 }

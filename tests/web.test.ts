@@ -11,9 +11,16 @@ vi.mock("firebase/firestore", () => ({
     else if (next?.next) next.next({ docChanges: () => [1, 2, 3, 4] });
     return () => {};
   }),
+  getDocFromServer: vi.fn(async (_ref: unknown) => ({ id: "x" })),
+  getDocsFromServer: vi.fn(async (_q: unknown) => ({ size: 5, docs: [1, 2, 3, 4, 5] })),
+  getDocFromCache: vi.fn(async (_ref: unknown) => ({ id: "cached" })),
+  getDocsFromCache: vi.fn(async (_q: unknown) => ({ size: 9, docs: [] })),
+  getCountFromServer: vi.fn(async (_q: unknown) => ({ data: () => ({ count: 2500 }) })),
+  getAggregateFromServer: vi.fn(async (_q: unknown) => ({ data: () => ({ count: 0 }) })),
 }));
 
-const { getDoc, getDocs, onSnapshot } = await import("../src/web/firestore");
+const { getDoc, getDocs, onSnapshot, getDocsFromServer, getDocsFromCache, getCountFromServer } =
+  await import("../src/web/firestore");
 const ctx = await import("../src/web/context");
 const { configureWebMeter, flushWeb } = await import("../src/web/meter");
 import type { BucketsReport, Sink } from "../src/sink";
@@ -64,5 +71,24 @@ describe("web firestore wrappers", () => {
   it("the wrapped read returns the exact real result", async () => {
     const out = await getDoc({ path: "x/y" } as any);
     expect(out.id).toBe("x");
+  });
+
+  it("getDocsFromServer counts snapshot.size (a billed read)", async () => {
+    await getDocsFromServer({ path: "posts" } as any);
+    await flushWeb();
+    expect(sink.reports[0]!.byLabel["col:posts"]).toEqual({ read: 5 });
+  });
+
+  it("getDocsFromCache counts NOTHING — cache hits aren't billed", async () => {
+    const out = await getDocsFromCache({ path: "posts" } as any);
+    expect(out.size).toBe(9); // real result returned
+    await flushWeb();
+    expect(sink.reports.length).toBe(0); // no report — zero reads counted
+  });
+
+  it("getCountFromServer estimates ceil(count/1000), min 1", async () => {
+    await getCountFromServer({ path: "events" } as any); // mock count = 2500 → 3
+    await flushWeb();
+    expect(sink.reports[0]!.byLabel["col:events"]).toEqual({ read: 3 });
   });
 });

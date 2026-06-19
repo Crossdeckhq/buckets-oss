@@ -1,6 +1,6 @@
 {
   "name": "@cross-deck/buckets",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Know exactly what every database read costs you — and who caused it. A tiny, never-throws read-cost collector for Firestore, server AND browser.",
   "license": "MIT",
   "author": "Crossdeck",
@@ -17,7 +17,8 @@
       "types": "./dist/web.d.ts",
       "import": "./dist/web.mjs",
       "require": "./dist/web.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",

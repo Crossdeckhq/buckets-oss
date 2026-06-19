@@ -38,9 +38,20 @@ export function initBucketsWeb(options: InitWebOptions): void {
   configureWebMeter({ sink, flushIntervalMs: options.flushIntervalMs, onError: options.onError });
 }
 
-// The tagging verb + the metered read wrappers.
+// The tagging verb + the metered read wrappers (swap your firebase/firestore
+// import for these). Cache-only reads pass through uncounted (they aren't billed).
 export { bucket } from "./context";
-export { getDoc, getDocs, onSnapshot } from "./firestore";
+export {
+  getDoc,
+  getDocs,
+  onSnapshot,
+  getDocFromServer,
+  getDocsFromServer,
+  getDocFromCache,
+  getDocsFromCache,
+  getCountFromServer,
+  getAggregateFromServer,
+} from "./firestore";
 export { flushWeb as flush } from "./meter";
 
 // The sink seam — for self-hosting the browser rollups instead of reporting to Crossdeck.

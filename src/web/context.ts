@@ -25,7 +25,9 @@ export function currentLabel(): string | undefined {
  */
 export function bucket<T>(name: string, fn: () => T): T {
   const prev = current;
-  current = name;
+  // NESTS into a path ("analytics" > "live-feed" → "analytics>live-feed") so the
+  // dashboard can drill from a coarse bucket into its parts.
+  current = prev ? `${prev}>${name}` : name;
   try {
     return fn();
   } finally {

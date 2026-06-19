@@ -43,15 +43,22 @@ export function currentCostTag(): CostTag {
   return store.getStore() ?? DEFAULT_TAG;
 }
 
+/** Hierarchy separator for bucket paths — Firestore-map-key-safe and distinct from
+ *  the "col:" leaf prefix. `bucket("a", () => bucket("b", …))` → "a>b". */
+export const BUCKET_SEP = ">";
+
 /**
  * `bucket(name, fn)` — the headline verb, the `track()` of cost. Run `fn` with
- * every operation inside it attributed to the bucket `name`; the attribution
- * rides the async subtree automatically. The one verb most developers ever touch:
+ * every operation inside it attributed to the bucket `name`; the attribution rides
+ * the async subtree automatically. NESTS: a `bucket()` inside another COMPOSES into
+ * a path (`"analytics" > "rollup"` → `"analytics>rollup"`), so the dashboard can
+ * drill from the coarse bucket down into its parts. The one verb most developers touch:
  *
- *   await bucket("nightly-export", async () => {
- *     const rows = await db.collection("events").where(...).get(); // → "nightly-export"
- *   });
+ *   await bucket("analytics", () =>
+ *     bucket("rollup", () => db.collection("events").where(...).get())); // → "analytics>rollup>col:events"
  */
 export function bucket<T>(name: string, fn: () => T): T {
-  return runWithCostTag({ ...currentCostTag(), label: name }, fn);
+  const parent = currentCostTag().label;
+  const path = parent ? `${parent}${BUCKET_SEP}${name}` : name;
+  return runWithCostTag({ ...currentCostTag(), label: path }, fn);
 }

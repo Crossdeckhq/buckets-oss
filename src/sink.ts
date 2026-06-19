@@ -37,9 +37,12 @@ export interface BucketsReport {
   /** UTC day "YYYY-MM-DD". */
   date: string;
   /** bucket name → counts. The heart of the report. */
-  byLabel: Record<string, OpCounts>;
+  byLabel: Record<string, ResourceCounts>;
   /** UTC hour "HH" → counts, for the hourly "did my fix land this hour?" view. */
-  byHour?: Record<string, OpCounts>;
+  byHour?: Record<string, ResourceCounts>;
+  /** UTC 5-minute slot "HHMM" (slot start) → counts. The fine grain for fast
+   *  verification against a provider console's "last hour" view. */
+  byMinute?: Record<string, ResourceCounts>;
 }
 
 /**

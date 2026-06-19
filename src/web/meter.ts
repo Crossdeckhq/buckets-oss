@@ -23,6 +23,8 @@ const SEP = "\u001f"; // ASCII Unit Separator
 const labelBuffer = new Map<string, number>();
 /** key = date <US> op <US> hour → count */
 const hourBuffer = new Map<string, number>();
+/** key = date <US> op <US> 5-min-slot ("HHMM") → count — fast-verification grain. */
+const minuteBuffer = new Map<string, number>();
 
 let sink: Sink | null = null;
 let flushIntervalMs = 60_000;
@@ -46,6 +48,10 @@ export function configureWebMeter(config: WebMeterConfig): void {
 
 const utcDate = (): string => new Date().toISOString().slice(0, 10);
 const utcHour = (): string => new Date().toISOString().slice(11, 13);
+const utcFiveMin = (): string => {
+  const iso = new Date().toISOString();
+  return iso.slice(11, 13) + String(Math.floor(Number(iso.slice(14, 16)) / 5) * 5).padStart(2, "0");
+};
 
 function ensureLoop(): void {
   if (timer) return;
@@ -70,8 +76,10 @@ export function recordWeb(op: OpType, n: number, label: string): void {
     labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + n);
     const hk = date + SEP + op + SEP + utcHour();
     hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + n);
+    const mk = date + SEP + op + SEP + utcFiveMin();
+    minuteBuffer.set(mk, (minuteBuffer.get(mk) ?? 0) + n);
     ensureLoop();
-    if (labelBuffer.size + hourBuffer.size > MAX_BUFFER_KEYS) void flushWeb();
+    if (labelBuffer.size + hourBuffer.size + minuteBuffer.size > MAX_BUFFER_KEYS) void flushWeb();
   } catch {
     /* metering is best-effort — never disturb the page */
   }
@@ -88,22 +96,25 @@ export async function flushWeb(): Promise<void> {
   if (!sink) {
     labelBuffer.clear();
     hourBuffer.clear();
+    minuteBuffer.clear();
     return;
   }
-  if (labelBuffer.size === 0 && hourBuffer.size === 0) return;
+  if (labelBuffer.size === 0 && hourBuffer.size === 0 && minuteBuffer.size === 0) return;
   flushing = true;
 
   const labels = new Map(labelBuffer);
   const hours = new Map(hourBuffer);
+  const minutes = new Map(minuteBuffer);
   labelBuffer.clear();
   hourBuffer.clear();
+  minuteBuffer.clear();
 
   try {
     const byDate = new Map<string, BucketsReport>();
     const reportFor = (date: string): BucketsReport => {
       let r = byDate.get(date);
       if (!r) {
-        r = { date, byLabel: {}, byHour: {} };
+        r = { date, byLabel: {}, byHour: {}, byMinute: {} };
         byDate.set(date, r);
       }
       return r;
@@ -115,6 +126,10 @@ export async function flushWeb(): Promise<void> {
     for (const [k, n] of hours) {
       const [date, op, hour] = k.split(SEP) as [string, OpType, string];
       add(reportFor(date).byHour!, hour, op, n);
+    }
+    for (const [k, n] of minutes) {
+      const [date, op, slot] = k.split(SEP) as [string, OpType, string];
+      add(reportFor(date).byMinute!, slot, op, n);
     }
     for (const report of byDate.values()) {
       await sink.flush(report);

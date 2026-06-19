@@ -57,6 +57,10 @@ describe("cost-meter", () => {
     // The hourly view carries the same totals, keyed by UTC hour.
     const hourTotals = Object.values(r.byHour ?? {}).reduce((s, o) => s + (o.read ?? 0), 0);
     expect(hourTotals).toBe(15);
+    // And the 5-minute view carries the same totals, keyed by slot ("HHMM").
+    const minuteTotals = Object.values(r.byMinute ?? {}).reduce((s, o) => s + (o.read ?? 0), 0);
+    expect(minuteTotals).toBe(15);
+    expect(Object.keys(r.byMinute ?? {})[0]).toMatch(/^\d{4}$/); // slot key "HHMM"
   });
 
   it("cascades an untagged read to col:<collection>, and to uncategorized with nothing", async () => {

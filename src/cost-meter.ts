@@ -36,10 +36,14 @@ export interface CostHint {
 // this, so the key never collides with a name that has a "|" or ":" in it.
 const SEP = "\u001f"; // ASCII Unit Separator
 
-/** key = date <NUL> op <NUL> label → count */
+/** key = date <NUL> resource <NUL> label → count */
 const labelBuffer = new Map<string, number>();
-/** key = date <NUL> op <NUL> hour → count */
+/** key = date <NUL> resource <NUL> hour → count */
 const hourBuffer = new Map<string, number>();
+/** key = date <NUL> resource <NUL> 5-min-slot ("HHMM") → count. The fine grain
+ *  that lets a developer verify against the provider console's "last hour" within
+ *  minutes of installing — not after a day. Still one maintained doc, zero reads. */
+const minuteBuffer = new Map<string, number>();
 
 let sink: Sink | null = null;
 let flushIntervalMs = 60_000;
@@ -64,6 +68,13 @@ export function configureMeter(config: MeterConfig): void {
 
 const utcDate = (): string => new Date().toISOString().slice(0, 10);
 const utcHour = (): string => new Date().toISOString().slice(11, 13);
+/** UTC 5-minute slot of the day as "HHMM" — the slot START (e.g. 08:47 → "0845"). */
+const utcFiveMin = (): string => {
+  const iso = new Date().toISOString();
+  const hh = iso.slice(11, 13);
+  const mm = Math.floor(Number(iso.slice(14, 16)) / 5) * 5;
+  return hh + String(mm).padStart(2, "0");
+};
 
 function ensureFlushLoop(): void {
   if (timer) return;
@@ -96,8 +107,10 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + quantity);
     const hk = date + SEP + resource + SEP + utcHour();
     hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + quantity);
+    const mk = date + SEP + resource + SEP + utcFiveMin();
+    minuteBuffer.set(mk, (minuteBuffer.get(mk) ?? 0) + quantity);
     ensureFlushLoop();
-    if (labelBuffer.size + hourBuffer.size > MAX_BUFFER_KEYS) void flush();
+    if (labelBuffer.size + hourBuffer.size + minuteBuffer.size > MAX_BUFFER_KEYS) void flush();
   } catch {
     /* metering is best-effort — never disturb the caller */
   }
@@ -134,22 +147,25 @@ export async function flush(): Promise<void> {
   if (!sink) {
     labelBuffer.clear();
     hourBuffer.clear();
+    minuteBuffer.clear();
     return;
   }
-  if (labelBuffer.size === 0 && hourBuffer.size === 0) return;
+  if (labelBuffer.size === 0 && hourBuffer.size === 0 && minuteBuffer.size === 0) return;
   flushing = true;
 
   const labels = new Map(labelBuffer);
   const hours = new Map(hourBuffer);
+  const minutes = new Map(minuteBuffer);
   labelBuffer.clear();
   hourBuffer.clear();
+  minuteBuffer.clear();
 
   try {
     const byDate = new Map<string, BucketsReport>();
     const reportFor = (date: string): BucketsReport => {
       let r = byDate.get(date);
       if (!r) {
-        r = { date, byLabel: {}, byHour: {} };
+        r = { date, byLabel: {}, byHour: {}, byMinute: {} };
         byDate.set(date, r);
       }
       return r;
@@ -161,6 +177,10 @@ export async function flush(): Promise<void> {
     for (const [k, n] of hours) {
       const [date, op, hour] = k.split(SEP) as [string, OpType, string];
       add(reportFor(date).byHour!, hour, op, n);
+    }
+    for (const [k, n] of minutes) {
+      const [date, op, slot] = k.split(SEP) as [string, OpType, string];
+      add(reportFor(date).byMinute!, slot, op, n);
     }
     for (const report of byDate.values()) {
       await sink.flush(report);

@@ -80,6 +80,39 @@ haven't named yet. Buckets counted them at the database driver, not in your code
 
 ---
 
+## Server *and* browser — install where you read
+
+A collector counts reads **where it runs.** With Firestore, your app often reads
+from **two** places: your **server** (the snippet above) and your users'
+**browsers** — live `onSnapshot` listeners and direct `getDocs`/`getDoc` calls
+that bill straight to your project and *never touch your server*. A server-only
+collector can't see those, the same way `@cross-deck/node` can't see a browser
+event. So Buckets ships a collector for each surface.
+
+**Browser** — swap one import and add one line:
+
+```ts
+import { initBucketsWeb, bucket } from "@cross-deck/buckets/web";
+// was: import { getDocs, onSnapshot } from "firebase/firestore"
+import { getDocs, onSnapshot } from "@cross-deck/buckets/web";
+
+initBucketsWeb({ apiKey: "cd_pk_…" }); // your PUBLISHABLE key — safe in client code
+
+bucket("live-feed", () => onSnapshot(liveQuery, render)); // every fire counted
+```
+
+Each listener fire is counted as the documents it delivers — exactly what Firebase
+bills — labelled and reported up the **same pipe**, so your dashboard shows
+**server and browser reads side by side.** Install one, or both. The promise is
+precise: **Buckets captures every read that flows through a collector** — put one
+on each surface you read from, and you see all of it.
+
+> We learned this the hard way dogfooding on our own dashboard: 94% of our reads
+> were browser-side and a server-only install was blind to them. The browser
+> collector is the fix — and the reason "install where you read" is the whole model.
+
+---
+
 ## What you get
 
 A small, cheap, daily document per app — the **rollup**. This is the entire output,
@@ -349,7 +382,8 @@ reconciles against your provider's invoice instead of drifting from it.
 
 | Datastore | Status |
 |---|---|
-| **Google Cloud Firestore** (firebase-admin) | ✅ Supported |
+| **Firestore — server** (`firebase-admin`) | ✅ Supported |
+| **Firestore — browser** (`firebase` JS SDK) | ✅ Supported — `@cross-deck/buckets/web` |
 | Postgres · DynamoDB · MongoDB | 🔜 Adapter interface is public — contributions welcome |
 
 The trap *pattern* generalises to any driver with interceptable read methods, and

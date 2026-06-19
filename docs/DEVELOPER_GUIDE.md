@@ -500,6 +500,40 @@ changed something* and draws the line there.
 
 ---
 
+## 6.5 The browser adapter — `@cross-deck/buckets/web` (why it exists)
+
+**A collector counts reads where it runs.** The server trap (`installFirestoreMeter`)
+captures every read through `firebase-admin` — but with Firestore, a large share of
+reads often happen in the **browser**: live `onSnapshot` listeners and direct
+`getDocs`/`getDoc` calls via the `firebase` JS SDK. Those bill to the project and
+**never touch the server**, so a server-only collector is blind to them. We learned
+this dogfooding on our own dashboard — ~94% of reads were browser-side.
+
+The fix is a second collector, same wire contract, browser-shaped:
+
+- **Wrappers, not a prototype trap.** The modular client SDK's reads are free
+  functions, not prototype methods, so the adapter ships drop-in `getDoc`/`getDocs`/
+  `onSnapshot` you import from `@cross-deck/buckets/web` instead of `firebase/firestore`.
+  One import swap per file (the only extra touch vs the server's invisible trap).
+- **Counting.** `getDoc` = 1; `getDocs` = `snapshot.size`; `onSnapshot` = the
+  `docChanges().length` delivered on **each** fire (first fire = all matching docs;
+  each update = just the changed — exactly what a listener is billed).
+- **Tagging without AsyncLocalStorage.** The browser has none, and doesn't need it:
+  a read is set up synchronously, so `bucket(name, fn)` uses a module-level current
+  label captured at call time. An `onSnapshot` registered inside `bucket()` keeps
+  that name for every future fire.
+- **Reporting.** Same `Sink`/wire shape as the server. Two browser-forced changes:
+  it authenticates with a **publishable** key (`cd_pk_` — a secret can't live in
+  client code; the ingest accepts publishable keys for Buckets reports exactly as
+  the analytics SDK does for events), and it flushes on `visibilitychange→hidden` /
+  `pagehide` via `fetch(keepalive)` so the last window survives the tab closing.
+
+The model is **one package, a collector per surface — install where you read.** The
+"every read, no blind spots" promise is precise: every read *through a collector* is
+captured; put one on each surface (server, browser) and you see all of it.
+
+---
+
 ## 7. The governing rule: the OSS/private seam
 
 This is the most important paragraph in the document. Read it twice.

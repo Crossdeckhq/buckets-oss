@@ -7,9 +7,9 @@
  *   2. bucket(name, fn)             — name the read paths that matter
  *   3. (the dashboard shows the rest — and names the ones you haven't yet)
  */
-import { configureMeter, type MeterConfig } from "./cost-meter.js";
-import { ReportSink, type Sink } from "./sink.js";
-import { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore.js";
+import { configureMeter, type MeterConfig } from "./cost-meter";
+import { ReportSink, type Sink } from "./sink";
+import { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
 
 export interface InitOptions {
   /** The project's `cd_sk_` SECRET key. Server-to-server only — never a browser key. */
@@ -53,7 +53,7 @@ export {
   refineCostTag,
   currentCostTag,
   type CostTag,
-} from "./cost-context.js";
+} from "./cost-context";
 
 // Manual recorders (for non-Firestore ops, or when you don't install the trap).
 export {
@@ -64,10 +64,10 @@ export {
   type CostHint,
   type OpType,
   type MeterConfig,
-} from "./cost-meter.js";
+} from "./cost-meter";
 
 // The trap (the only datastore adapter today) + its class shape.
-export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore.js";
+export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
 
 // The sink seam — for self-hosting rollups instead of reporting to Crossdeck.
-export { ReportSink, type Sink, type BucketsReport, type OpCounts, type ReportSinkConfig } from "./sink.js";
+export { ReportSink, type Sink, type BucketsReport, type OpCounts, type ReportSinkConfig } from "./sink";

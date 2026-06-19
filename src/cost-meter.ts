@@ -12,8 +12,8 @@
  * swallows its own errors; a failed flush drops that window's counts (surfaced via
  * `onError` if you pass one) rather than disturbing the app.
  */
-import { currentCostTag } from "./cost-context.js";
-import type { Sink, BucketsReport, OpCounts } from "./sink.js";
+import { currentCostTag } from "./cost-context";
+import type { Sink, BucketsReport, OpCounts } from "./sink";
 
 export type OpType = "read" | "write" | "delete";
 

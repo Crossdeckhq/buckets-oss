@@ -24,7 +24,7 @@
  * CollectionReference.get IS Query.get (shared prototype method), so patching Query
  * covers collections with no double-count.
  */
-import { recordReads, type CostHint } from "../cost-meter.js";
+import { recordReads, type CostHint } from "../cost-meter";
 
 let installed = false;
 

@@ -12,7 +12,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import * as Firestore from "firebase-admin/firestore";
 
-import { init, bucket } from "@crossdeck/buckets";
+import { init, bucket } from "@cross-deck/buckets";
 
 // ── 1. Configure once, at module load (before any reads) ─────────────────────
 init({

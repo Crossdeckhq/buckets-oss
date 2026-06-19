@@ -10,7 +10,7 @@ user who triggered it — automatically, with no blind spots, and without ever
 becoming a cost itself.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![npm](https://img.shields.io/badge/npm-%40crossdeck%2Fbuckets-black)](https://www.npmjs.com/package/@crossdeck/buckets)
+[![npm](https://img.shields.io/badge/npm-%40cross-deck%2Fbuckets-black)](https://www.npmjs.com/package/@cross-deck/buckets)
 [![Firestore](https://img.shields.io/badge/datastore-Firestore-black)](#datastore-support)
 [![Made by Crossdeck](https://img.shields.io/badge/made%20by-Crossdeck-black)](https://cross-deck.com)
 
@@ -41,7 +41,7 @@ Buckets fixes this by construction.
 ## Quickstart
 
 ```bash
-npm install @crossdeck/buckets
+npm install @cross-deck/buckets
 ```
 
 **1. Install the meter once, at process start.** From this line on, *every*
@@ -50,7 +50,7 @@ summary is reported to your Crossdeck project about once a minute. Your `cd_sk_`
 secret key is all the wiring there is.
 
 ```ts
-import { init, installFirestoreMeter } from "@crossdeck/buckets";
+import { init, installFirestoreMeter } from "@cross-deck/buckets";
 import { getFirestore, Firestore, Query, DocumentReference } from "firebase-admin/firestore";
 
 init({ apiKey: process.env.CROSSDECK_SECRET_KEY });   // reports up to Crossdeck (~1/min)
@@ -66,7 +66,7 @@ attributed to that name (anything you don't name still shows up, labelled by its
 collection).
 
 ```ts
-import { bucket } from "@crossdeck/buckets";
+import { bucket } from "@cross-deck/buckets";
 
 await bucket("pulse-map", async () => {
   const dots  = await db.collection("visitors").where("live", "==", true).get(); // → pulse-map
@@ -237,7 +237,7 @@ that answers *what's being read.* Buckets becomes genuinely useful the moment yo
 **name the read path yourself** — wrap it in a bucket:
 
 ```ts
-import { bucket } from "@crossdeck/buckets";
+import { bucket } from "@cross-deck/buckets";
 
 // every read inside here is attributed to "nightly-export"
 await bucket("nightly-export", async () => {
@@ -445,5 +445,5 @@ to protect our invoice, it's good enough for yours.
 <br>
 <strong>Stop guessing what your database costs. Start knowing.</strong>
 <br><br>
-<code>npm install @crossdeck/buckets</code>
+<code>npm install @cross-deck/buckets</code>
 </div>

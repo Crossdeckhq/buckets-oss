@@ -1,5 +1,5 @@
 /**
- * @crossdeck/buckets — know exactly what every database read costs you, and who
+ * @cross-deck/buckets — know exactly what every database read costs you, and who
  * caused it. A tiny, never-throws collector for Firestore.
  *
  * The whole footprint a consumer sees:

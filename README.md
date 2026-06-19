@@ -332,6 +332,31 @@ primitive that the whole ecosystem can build on — so we open-sourced it, and w
 publish the rollup schema so you can consume it with any tool you like, including
 your own. **The best place to read Buckets data should be earned, never locked.**
 
+### Free with the collector — and what Crossdeck adds
+
+The collector is yours, free, forever: it meters every read on the surface you put
+it on, never costs you reads to *run*, and you can point it at your own sink and read
+the raw numbers yourself. That's a real tool on its own.
+
+Two honest limits come with going it alone — and they're exactly what Crossdeck is for:
+
+- **You see the surface you installed on.** Drop it in your server and you see server
+  reads — often the *minority*. Most apps read from the browser too (a separate
+  install), and the bill is the sum of both. **Crossdeck stitches server + browser +
+  every surface into one number**, so you stop reasoning from a slice.
+- **Reading the numbers back yourself costs a few reads** — querying your own stored
+  rollups is still a read. **Crossdeck maintains the summary and serves it to you free,
+  live, any time** — the cost tool never costs you to look.
+
+And because it's already wired in, Crossdeck turns the raw meter into the thing you
+*act* on: the **drill-down** (tag → see the next-biggest → tag again, down to the
+line), the **before/after fix verdict**, a **7-day baseline**, and **Slack alerts that
+page you before the invoice**. The numbers are identical on both sides — same counts,
+same source — Crossdeck just makes them whole, free to read, and impossible to miss.
+
+Getting there is one step you were taking anyway: **onboard, install the SDK once, and
+read-cost comes with it** — no second setup.
+
 ### Cost should page you like an exception — not surprise you like an invoice
 
 You already know what your code *should* do. You wrote the analytics pipeline; you

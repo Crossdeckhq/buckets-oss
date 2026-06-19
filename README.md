@@ -74,9 +74,24 @@ await bucket("pulse-map", async () => {
 });
 ```
 
-**3. That's it.** Open your Crossdeck dashboard and your operations are there —
-`pulse-map`, every other bucket you named, and an `unknown` row for anything you
-haven't named yet. Buckets counted them at the database driver, not in your code.
+**3. Read it back — right where you code.** Buckets writes a live readout to
+`.crossdeck/buckets.md` (biggest bucket first). Open it, or just ask your AI session
+**"read me my buckets"** — it's a plain file on disk, no dashboard required:
+
+```
+# Buckets — reads on this surface
+**32K reads** · 2026-06-19 (UTC)
+
+| bucket            | named | reads |
+| ----------------- | :---: | ----: |
+| headline-counters |   ✓   |   31K |
+| subscriptions     |   —   |  1.1K |
+```
+
+**No Crossdeck key needed for any of that.** `init()` with no `apiKey` meters locally
+and writes the readout — the free, no-account wedge. Add a key and it *also* reports
+up so the same numbers surface on your dashboard, with the drill-down, before/after,
+and read-spike alerts. (Set `mirror: false` to turn the local file off.)
 
 ---
 

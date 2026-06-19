@@ -97,3 +97,14 @@ export class ReportSink implements Sink {
     }
   }
 }
+
+/**
+ * A sink that does nothing. Used when the local mirror is turned off AND no upstream
+ * was configured — the meter still needs a sink to flush into, but there's nowhere to
+ * send. Counts are dropped by the developer's explicit choice.
+ */
+export class NullSink implements Sink {
+  async flush(): Promise<void> {
+    /* intentionally empty */
+  }
+}

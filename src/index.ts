@@ -8,12 +8,18 @@
  *   3. (the dashboard shows the rest — and names the ones you haven't yet)
  */
 import { configureMeter, type MeterConfig } from "./cost-meter";
-import { ReportSink, type Sink } from "./sink";
+import { ReportSink, NullSink, type Sink } from "./sink";
+import { MirrorSink, DEFAULT_MIRROR_DIR } from "./mirror";
 import { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
 
 export interface InitOptions {
-  /** The project's `cd_sk_` SECRET key. Server-to-server only — never a browser key. */
-  apiKey: string;
+  /**
+   * The project's `cd_sk_` SECRET key. Server-to-server only — never a browser key.
+   * OPTIONAL: with no key, Buckets still meters locally and writes the readout to
+   * disk (`.crossdeck/buckets.md`) — the free, no-account wedge. Add a key and it
+   * also reports up to Crossdeck so the numbers surface on your dashboard.
+   */
+  apiKey?: string;
   /**
    * Pass the namespace from `firebase-admin/firestore` to auto-install the read
    * trap (recommended — this is what makes every read count with no per-call work).
@@ -27,17 +33,30 @@ export interface InitOptions {
   flushIntervalMs?: number;
   /** Bring your own sink (self-host the rollups). Defaults to reporting up to Crossdeck. */
   sink?: Sink;
+  /**
+   * Where to write the local readout — the file "read me my buckets" reads back.
+   * Defaults to `.crossdeck`. Pass `false` to turn the local mirror off entirely.
+   */
+  mirror?: string | false;
   /** Notified when a flush fails, so a dropped window is never silent. Best-effort. */
   onError?: MeterConfig["onError"];
 }
 
 /**
- * Configure Buckets once, at process start. Points the meter at a sink (Crossdeck's
- * ingest by default) and — if you pass `firestore` — installs the universal read
- * trap so every read counts automatically.
+ * Configure Buckets once, at process start. Always meters locally and writes the
+ * readout to disk; if you pass `apiKey` (or your own `sink`) it ALSO reports up to
+ * Crossdeck. Pass `firestore` to install the universal read trap so every read counts
+ * automatically.
  */
-export function init(options: InitOptions): void {
-  const sink = options.sink ?? new ReportSink({ apiKey: options.apiKey, endpoint: options.endpoint });
+export function init(options: InitOptions = {}): void {
+  // Upstream: your sink, else a Crossdeck reporter if a key was given, else nothing.
+  const upstream: Sink | null =
+    options.sink ?? (options.apiKey ? new ReportSink({ apiKey: options.apiKey, endpoint: options.endpoint }) : null);
+  // Default behaviour tees every flush to a local readout; `mirror:false` opts out.
+  const sink: Sink =
+    options.mirror === false
+      ? upstream ?? new NullSink()
+      : new MirrorSink(upstream, typeof options.mirror === "string" ? options.mirror : DEFAULT_MIRROR_DIR);
   configureMeter({ sink, flushIntervalMs: options.flushIntervalMs, onError: options.onError });
   if (options.firestore) installFirestoreMeter(options.firestore);
 }
@@ -76,9 +95,14 @@ export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firesto
 // The sink seam — for self-hosting rollups instead of reporting to Crossdeck.
 export {
   ReportSink,
+  NullSink,
   type Sink,
   type BucketsReport,
   type ResourceCounts,
   type OpCounts,
   type ReportSinkConfig,
 } from "./sink";
+
+// The local readout — the file "read me my buckets" reads back, and its renderer.
+export { MirrorSink, DEFAULT_MIRROR_DIR } from "./mirror";
+export { renderReadout, READOUT_FOOTER } from "./readout";

@@ -7,7 +7,7 @@ import { defineConfig } from "tsup";
 // re-exported from this one entry. CommonJS backends (the Firebase Functions
 // default) `require` it; ESM backends `import` it. Same code, both worlds.
 export default defineConfig({
-  entry: { index: "src/index.ts" },
+  entry: { index: "src/index.ts", web: "src/web/index.ts" },
   format: ["cjs", "esm"],
   dts: true,
   clean: true,

@@ -8,11 +8,26 @@
  * own API) without touching the meter.
  */
 
-export interface OpCounts {
+/**
+ * Counts for ONE bucket, keyed by RESOURCE UNIT — the raw quantity of each unit,
+ * nothing more (no money; you verify cost on your provider's bill).
+ *
+ * Firestore, the first adapter, emits `read` / `write` / `delete`. Other adapters
+ * emit their own units (`clickhouse.query_ms`, `openai.tokens`, …). The rule that
+ * keeps this honest: **each resource is its own line. Counts are only ever summed
+ * WITHIN a resource, NEVER across one.** A read is not a query-millisecond; the two
+ * never land in the same number. (There is deliberately no "total units" field.)
+ */
+export interface ResourceCounts {
   read?: number;
   write?: number;
   delete?: number;
+  /** Any other resource unit an adapter emits — kept distinct, never merged. */
+  [resource: string]: number | undefined;
 }
+
+/** @deprecated name — kept for back-compat; use {@link ResourceCounts}. */
+export type OpCounts = ResourceCounts;
 
 /**
  * One coalesced report — the wire contract (see docs/ROLLUP_SCHEMA.md). The meter

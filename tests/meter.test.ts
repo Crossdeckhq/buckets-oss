@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   configureMeter,
+  record,
   recordReads,
   recordFirestore,
   flush,
@@ -93,6 +94,20 @@ describe("cost-meter", () => {
     });
     await flush();
     expect(sink.reports[0]!.byLabel["mutations"]).toEqual({ write: 3, delete: 1 });
+  });
+
+  it("records ANY resource unit, and each stays its OWN line — never merged", async () => {
+    await bucket("search", async () => {
+      record("read", 10000); // Firestore reads
+      record("clickhouse.query_ms", 1250); // a totally different unit
+      record("clickhouse.query_ms", 750); // accumulates WITHIN its own resource
+    });
+    await flush();
+    // Two distinct resources under one bucket — separate slots, no cross-sum.
+    expect(sink.reports[0]!.byLabel["search"]).toEqual({
+      read: 10000,
+      "clickhouse.query_ms": 2000,
+    });
   });
 });
 

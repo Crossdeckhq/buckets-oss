@@ -86,6 +86,39 @@ the product — the product is each app watching its own path.
 
 ---
 
+## 1.6 What Buckets measures: resource units (the governing model)
+
+Buckets is **not** a reads-and-writes tool. It measures **resource units** — the raw
+quantity of whatever a source charges for — and Firestore is merely the first source.
+This is the model every current and future adapter obeys.
+
+**The unit.** A measurement is `{ bucket, resource, quantity }` (plus the time grain
++ the surface the bucket name encodes). Firestore emits `read` / `write` / `delete`;
+a ClickHouse adapter emits `clickhouse.query_ms`; OpenAI, `openai.tokens`. The
+`resource` is a namespaced identifier (`<source>.<unit>`), with one canonical unit
+each — so two adapters can never collide or be confused.
+
+**The two laws (this is the whole of the discipline — treat them as invariants):**
+
+1. **Each resource is its own currency; you NEVER sum across resources.** Quantities
+   accumulate only WITHIN a single resource. The wire shape makes a cross-resource
+   total *unrepresentable* — `byLabel: { search: { read: 10000, "clickhouse.query_ms": 1250 } }`
+   has no field that blends them, on purpose. Adding a read to a query-millisecond is
+   the "5 rand → $4 000" error; the schema forbids it by construction.
+2. **Raw counts only — no money, ever.** Buckets never multiplies a quantity by a
+   price or emits a dollar figure. Prices change by plan/region/date; the count does
+   not. Money is the provider's bill's job; Buckets' job is to tell you *which feature
+   consumed how much of each unit*, so you can reconcile against that bill.
+
+**The adapter contract.** Every adapter, regardless of source, does exactly one
+thing: call `record(resource, quantity)` (under the ambient `bucket()` tag) for each
+billable unit it observes. It declares its resource id(s), counts the real quantity,
+and reports them up the same pipe in the same `ResourceCounts` shape. Same model,
+different source. **Name an adapter for its source, never "a database adapter"** —
+the mental model is *Buckets measures cost attribution; the source is incidental.*
+
+---
+
 ## 2. Why it works — three principles
 
 Everything in the codebase follows from three ideas. If you understand these, the

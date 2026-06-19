@@ -55,13 +55,17 @@ export {
   type CostTag,
 } from "./cost-context";
 
-// Manual recorders (for non-Firestore ops, or when you don't install the trap).
+// Recorders. `record(resource, quantity)` is the generic adapter primitive — count
+// any resource unit (a future adapter records "clickhouse.query_ms"); recordReads/
+// Writes/Deletes are the Firestore conveniences over it.
 export {
+  record,
   recordReads,
   recordWrites,
   recordDeletes,
   flush,
   type CostHint,
+  type ResourceUnit,
   type OpType,
   type MeterConfig,
 } from "./cost-meter";
@@ -70,4 +74,11 @@ export {
 export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
 
 // The sink seam — for self-hosting rollups instead of reporting to Crossdeck.
-export { ReportSink, type Sink, type BucketsReport, type OpCounts, type ReportSinkConfig } from "./sink";
+export {
+  ReportSink,
+  type Sink,
+  type BucketsReport,
+  type ResourceCounts,
+  type OpCounts,
+  type ReportSinkConfig,
+} from "./sink";

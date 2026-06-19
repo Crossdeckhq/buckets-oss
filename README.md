@@ -388,6 +388,39 @@ reconciles against your provider's invoice instead of drifting from it.
 
 ---
 
+## One model: resource units
+
+Buckets doesn't really measure "reads and writes." It measures **resource units** —
+the raw quantity of whatever a service charges you for. Firestore happens to charge
+in reads, writes, and deletes, so those are its units. Other sources charge
+differently, and each gets its own units:
+
+| Source | Resource units |
+|---|---|
+| **Firestore** | `read`, `write`, `delete` |
+| ClickHouse | `clickhouse.query_ms`, `clickhouse.bytes_scanned` |
+| Redis | `redis.memory_mb` |
+| Cloudflare Workers | `cloudflare.invocations` |
+| OpenAI | `openai.tokens` |
+
+Two rules keep this honest, and they are the whole of the discipline:
+
+1. **Every resource keeps its own identity and its own unit.** A `read` is a read; a
+   `clickhouse.query_ms` is a query-millisecond. They are stored and shown on
+   **separate lines** and are **never added together** — there is deliberately no
+   "total units" number, because adding a read to a query-millisecond is meaningless.
+2. **Raw counts only — no money.** Buckets never multiplies units by a price or
+   guesses a dollar figure. It tells you *how much of each unit* a feature consumed;
+   you verify the cost against your provider's bill, which is the only source of
+   truth for money. (Prices change by plan, region, and date; the count doesn't.)
+
+Every adapter — present and future — does the same thing: `record(resource, quantity)`
+under a `bucket()`. Same model, many sources. That's why adapters are named for the
+**source**, not the database: Buckets answers *"what did feature X consume,"* and
+Firestore is simply the first place it found the leak.
+
+---
+
 ## Datastore support
 
 | Datastore | Status |

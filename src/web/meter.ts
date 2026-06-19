@@ -11,7 +11,9 @@
  */
 import type { Sink, BucketsReport, OpCounts } from "../sink";
 
-export type OpType = "read" | "write" | "delete";
+// A resource unit. The browser Firestore adapter records "read"; kept generic so
+// each resource stays distinct and is never merged with another.
+export type OpType = string;
 
 // ASCII Unit Separator — a bucket/collection name never contains it, so the
 // composite key splits back cleanly.

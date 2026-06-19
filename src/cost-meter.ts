@@ -13,9 +13,17 @@
  * `onError` if you pass one) rather than disturbing the app.
  */
 import { currentCostTag } from "./cost-context";
-import type { Sink, BucketsReport, OpCounts } from "./sink";
+import type { Sink, BucketsReport, ResourceCounts } from "./sink";
 
-export type OpType = "read" | "write" | "delete";
+/**
+ * A resource unit — what an adapter counts. Firestore emits `read`/`write`/
+ * `delete`; other adapters emit their own (`clickhouse.query_ms`, `openai.tokens`).
+ * It is a free identifier on purpose, BUT each one is kept entirely distinct: the
+ * meter only ever sums quantities WITHIN a single resource, never across two.
+ */
+export type ResourceUnit = string;
+/** @deprecated — Firestore-era name; use {@link ResourceUnit}. */
+export type OpType = ResourceUnit;
 
 /** Optional read-site hint — the collection touched, derived at the trap from the
  *  path. Lets an UNtagged read cascade to `col:<collection>` instead of vanishing. */
@@ -67,20 +75,27 @@ function ensureFlushLoop(): void {
   process.once?.("beforeExit", () => void flush());
 }
 
-/** Count `n` ops of `op` against the live tag. Never throws. */
-export function recordFirestore(op: OpType, n: number, hint?: CostHint): void {
+/**
+ * Count `quantity` of a `resource` against the live tag. THE adapter primitive —
+ * a Firestore adapter records "read"; a ClickHouse adapter records
+ * "clickhouse.query_ms"; an OpenAI adapter records "openai.tokens". Each resource
+ * is bucketed entirely on its own; nothing is ever added across resources. Never
+ * throws.
+ */
+export function record(resource: ResourceUnit, quantity: number, hint?: CostHint): void {
   try {
-    if (!Number.isFinite(n) || n <= 0) return;
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
     const t = currentCostTag();
     const date = utcDate();
-    // CASCADE — every op gets a label, by design (no blind spots): the bucket name
-    // wins; else the collection it actually touched (`col:posts`); else
-    // "uncategorized" as a loud last resort. A read is never invisible.
+    // CASCADE — every unit gets a label, by design (no blind spots): the bucket
+    // name wins; else the collection it actually touched (`col:posts`); else
+    // "uncategorized" as a loud last resort. A unit is never invisible.
     const label = t.label || (hint?.collection ? `col:${hint.collection}` : "uncategorized");
-    const lk = date + SEP + op + SEP + label;
-    labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + n);
-    const hk = date + SEP + op + SEP + utcHour();
-    hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + n);
+    // Key includes the resource, so each resource accumulates in its OWN slot.
+    const lk = date + SEP + resource + SEP + label;
+    labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + quantity);
+    const hk = date + SEP + resource + SEP + utcHour();
+    hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + quantity);
     ensureFlushLoop();
     if (labelBuffer.size + hourBuffer.size > MAX_BUFFER_KEYS) void flush();
   } catch {
@@ -88,20 +103,24 @@ export function recordFirestore(op: OpType, n: number, hint?: CostHint): void {
   }
 }
 
+/** @deprecated — use {@link record}. Firestore-era alias. */
+export const recordFirestore = record;
+
 /** Firestore bills a minimum of one read even for an empty result, so 0 counts as 1. */
 export function recordReads(n: number, hint?: CostHint): void {
-  recordFirestore("read", Math.max(n, 1), hint);
+  record("read", Math.max(n, 1), hint);
 }
 export function recordWrites(n = 1): void {
-  recordFirestore("write", n);
+  record("write", n);
 }
 export function recordDeletes(n = 1): void {
-  recordFirestore("delete", n);
+  record("delete", n);
 }
 
-function add(target: Record<string, OpCounts>, key: string, op: OpType, n: number): void {
+function add(target: Record<string, ResourceCounts>, key: string, resource: ResourceUnit, n: number): void {
   const bag = (target[key] ??= {});
-  bag[op] = (bag[op] ?? 0) + n;
+  // Accumulate WITHIN this resource only — never merge resources.
+  bag[resource] = (bag[resource] ?? 0) + n;
 }
 
 /**

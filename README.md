@@ -379,6 +379,8 @@ maintained summary, never scans your data.
 | Empty query | 1 read *(your provider bills a minimum of one)* |
 | `doc.get()` | 1 read |
 | `getAll(...refs)` | one read per ref |
+| `onSnapshot` fire (server + browser) | the docs that fire delivered |
+| `count()` / aggregation | ~`ceil(matched / 1000)` reads *(honest estimate — Firestore doesn't expose the exact index-entry count)* |
 | Write / delete | 1 each |
 
 Counts are **defensible** — every one traces to a billed operation, so the rollup

@@ -36,10 +36,12 @@ type AnyFn = (...args: any[]) => any;
  * `firebase-admin/firestore` — only the prototypes present are patched.
  */
 export interface FirestoreClasses {
-  Query?: { prototype: { get?: AnyFn } };
-  DocumentReference?: { prototype: { get?: AnyFn } };
+  Query?: { prototype: { get?: AnyFn; onSnapshot?: AnyFn } };
+  DocumentReference?: { prototype: { get?: AnyFn; onSnapshot?: AnyFn } };
   Transaction?: { prototype: { get?: AnyFn; getAll?: AnyFn } };
   Firestore?: { prototype: { getAll?: AnyFn } };
+  /** count() / sum() / average() — aggregation queries bill reads too. */
+  AggregateQuery?: { prototype: { get?: AnyFn } };
 }
 
 /** `projects/{id}/…` → the project id, else undefined. Pure string op. */
@@ -107,7 +109,7 @@ function meterCount(n: number, hint?: CostHint): void {
 export function installFirestoreMeter(classes: FirestoreClasses): void {
   if (installed) return;
   installed = true;
-  const { Query, DocumentReference, Transaction, Firestore } = classes;
+  const { Query, DocumentReference, Transaction, Firestore, AggregateQuery } = classes;
 
   // Query.get — covers Query AND CollectionReference (shared prototype method).
   const qGet = Query?.prototype?.get;
@@ -158,6 +160,61 @@ export function installFirestoreMeter(classes: FirestoreClasses): void {
       return res;
     };
   }
+
+  // AggregateQuery.get — count() / sum() / average(). Firestore bills one read per
+  // up to 1000 index entries scanned, and the client never sees that entry count —
+  // so this is an HONEST ESTIMATE: for count() we derive it from the result
+  // (ceil(count / 1000)), else the billed minimum of 1. Observe-only: it reads the
+  // result you already got, adds zero reads. (Closes the aggregation blind spot.)
+  const aGet = AggregateQuery?.prototype?.get;
+  if (aGet) {
+    AggregateQuery!.prototype.get = async function (this: unknown, ...args: any[]) {
+      const snap = await aGet.apply(this, args);
+      try {
+        const data = (snap as { data?: () => { count?: number } } | null)?.data?.();
+        const count = typeof data?.count === "number" ? data.count : 0;
+        meterCount(Math.max(1, Math.ceil(count / 1000)), hintFrom(this));
+      } catch {
+        /* best-effort */
+      }
+      return snap;
+    };
+  }
+
+  // Query.onSnapshot / DocumentReference.onSnapshot — server-side realtime
+  // listeners. We OBSERVE: wrap onNext and count the docs each fire delivers (a
+  // query's changed docs — first fire = all matching; a doc = 1). We attach no
+  // listener and issue no read; the meter just sees what the listener is already
+  // billed. (Closes the server-listener blind spot.)
+  const patchOnSnapshot = (proto: { onSnapshot?: AnyFn } | undefined, perDoc: boolean): void => {
+    const real = proto?.onSnapshot;
+    if (!real) return;
+    proto!.onSnapshot = function (this: unknown, ...args: any[]) {
+      const hint = hintFrom(this);
+      const i = args.findIndex((a) => typeof a === "function");
+      if (i >= 0) {
+        const onNext = args[i];
+        args[i] = function (snap: any) {
+          try {
+            const n = perDoc
+              ? 1
+              : typeof snap?.docChanges === "function"
+                ? snap.docChanges().length
+                : typeof snap?.size === "number"
+                  ? snap.size
+                  : 1;
+            if (n > 0) meterCount(n, hint);
+          } catch {
+            /* best-effort */
+          }
+          return onNext(snap);
+        };
+      }
+      return real.apply(this, args);
+    };
+  };
+  patchOnSnapshot(Query?.prototype, false);
+  patchOnSnapshot(DocumentReference?.prototype, true);
 }
 
 /** Test-only: reset the install guard so a suite can re-patch fresh prototypes. */

@@ -146,4 +146,47 @@ describe("installFirestoreMeter (the trap)", () => {
     const out = await new FakeDoc().get();
     expect(out).toBe(marker); // exact same object, untouched
   });
+
+  it("AggregateQuery.get — counts ceil(count/1000), minimum 1", async () => {
+    class FakeAgg {
+      constructor(private c: number) {}
+      async get(): Promise<{ data: () => { count: number } }> {
+        const c = this.c;
+        return { data: () => ({ count: c }) };
+      }
+    }
+    installFirestoreMeter({ AggregateQuery: FakeAgg as never });
+    await new FakeAgg(0).get(); // empty aggregate → billed minimum 1
+    await new FakeAgg(2500).get(); // 2500 entries → ceil(2500/1000) = 3
+    await flush();
+    expect(sink.reports[0]!.byLabel["uncategorized"]).toEqual({ read: 4 }); // 1 + 3
+  });
+
+  it("Query.onSnapshot — counts the docChanges delivered on each fire", async () => {
+    class FakeQ {
+      onSnapshot(onNext: (s: unknown) => void): () => void {
+        onNext({ docChanges: () => [1, 2, 3] }); // first fire: 3 docs
+        onNext({ docChanges: () => [1] }); // an update: 1 changed
+        return () => {};
+      }
+    }
+    installFirestoreMeter({ Query: FakeQ as never });
+    new FakeQ().onSnapshot(() => {});
+    await flush();
+    expect(sink.reports[0]!.byLabel["uncategorized"]).toEqual({ read: 4 }); // 3 + 1
+  });
+
+  it("DocumentReference.onSnapshot — counts 1 per fire", async () => {
+    class FakeDocStream {
+      onSnapshot(onNext: (s: unknown) => void): () => void {
+        onNext({});
+        onNext({});
+        return () => {};
+      }
+    }
+    installFirestoreMeter({ DocumentReference: FakeDocStream as never });
+    new FakeDocStream().onSnapshot(() => {});
+    await flush();
+    expect(sink.reports[0]!.byLabel["uncategorized"]).toEqual({ read: 2 });
+  });
 });

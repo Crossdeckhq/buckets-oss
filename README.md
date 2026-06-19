@@ -296,6 +296,20 @@ about. Two grains:
 - **Tag a bucket** (coarse) — a whole handler or job: `bucket("pulse-map", handler)`
 - **Tag a single read** (fine) — one query: `bucket("owner-lookup", () => db.doc(id).get())`
 
+**Nest to drill down.** A `bucket()` inside another **composes into a path** —
+the dashboard reads that path as a tree, so you tag the biggest bucket, see what's
+under it, tag *that*, and the next-biggest surfaces. A tagged bucket also keeps the
+collection it read as the leaf, so you never lose where the units actually went:
+
+```ts
+await bucket("analytics", () =>
+  bucket("rollup", () => db.collection("events").where(/*…*/).get()));
+// → "analytics > rollup > col:events"
+```
+
+That waterfall — tag, drill, tag again — is how you walk a bill down from "where's
+it all going?" to the exact line, one ship at a time.
+
 `unknown` is never a dead end. It's a to-do with a one-line fix — exactly like a
 custom analytics event you haven't named yet. You tag until you've found your
 source; Buckets just shows the names resolving in.

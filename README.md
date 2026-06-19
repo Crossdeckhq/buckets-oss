@@ -399,9 +399,13 @@ That's the line between the open primitive and the product built on it.
 ## FAQ
 
 **Is this really free, or is there a catch?**
-Genuinely free, MIT, forever. The collector and the schema are the open primitive.
-We make money on the *interpretation* layer (Crossdeck), not on locking up your
-own cost data. Your rollups are yours, in your datastore, readable by anything.
+No catch — and that includes Crossdeck itself. The collector and the schema are
+MIT, free forever; **and seeing your numbers on Crossdeck is free too**, on a
+genuinely generous free tier. We never charge you to watch your own read costs —
+there's no trial clock, no paywall, no "upgrade to see your data." This isn't a
+funnel dressed up as open source. Your rollups are yours — in your datastore,
+readable by anything, with or without us. Crossdeck earns its keep on the broader
+platform you can grow into, never on locking up the cost data you already own.
 
 **Won't patching the SDK slow down my reads?**
 No. The overhead is one in-memory map increment per read. No I/O is added to the

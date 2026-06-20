@@ -302,11 +302,18 @@ await bucket("nightly-export", async () => {
 });
 ```
 
-Now those `col:events` reads that were sitting under `unknown` show up as
-`nightly-export` on the dashboard. See an `unknown` bucket you can't explain?
-**Drill in, wrap that path in a `bucket()`, ship, look again** — and keep going,
-coarse to fine, until the read is named all the way down to the line you care
-about. Two grains:
+From the next read on, that path reports as `nightly-export` instead of `col:events`.
+
+> **Tagging applies going forward, not backward.** Buckets never rewrites counts
+> that already happened — a count is a fact at the moment it occurs. So after you
+> ship a tag you will **not** see the old `col:events` bucket rename itself. You'll
+> see a **new `nightly-export` bucket appear and grow** as fresh reads land, while
+> the unnamed bucket stops climbing. The next full day shows the path named from its
+> first hour. (Watch for the *new* name appearing — not the old bar changing colour.)
+
+See an `unknown` bucket you can't explain? **Drill in, wrap that path in a
+`bucket()`, ship, look again** — and keep going, coarse to fine, until the read is
+named all the way down to the line you care about. Two grains:
 
 - **Tag a bucket** (coarse) — a whole handler or job: `bucket("pulse-map", handler)`
 - **Tag a single read** (fine) — one query: `bucket("owner-lookup", () => db.doc(id).get())`
@@ -327,7 +334,8 @@ it all going?" to the exact line, one ship at a time.
 
 `unknown` is never a dead end. It's a to-do with a one-line fix — exactly like a
 custom analytics event you haven't named yet. You tag until you've found your
-source; Buckets just shows the names resolving in.
+source; the new names appear as fresh reads land, and the next full day starts
+fully named.
 
 ---
 

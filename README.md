@@ -496,16 +496,38 @@ Firestore is simply the first place it found the leak.
 
 ## Datastore support
 
-| Datastore | Status |
-|---|---|
-| **Firestore — server** (`firebase-admin`) | ✅ Supported |
-| **Firestore — browser** (`firebase` JS SDK) | ✅ Supported — `@cross-deck/buckets/web` |
-| Postgres · DynamoDB · MongoDB | 🔜 Adapter interface is public — contributions welcome |
+| Datastore | Unit measured | Status |
+|---|---|---|
+| **Firestore — server** (`firebase-admin`) | reads | ✅ Supported |
+| **Firestore — browser** (`firebase` JS SDK) | reads | ✅ Supported — `@cross-deck/buckets/web` |
+| **MongoDB** (`mongodb` driver) | documents read | ✅ Supported — `installMongoMeter` |
+| Postgres · DynamoDB · Cosmos | (per-source unit) | 🔜 Adapter interface is public — contributions welcome |
 
-The trap *pattern* generalises to any driver with interceptable read methods, and
-the storage `Sink` interface is datastore-agnostic. Firestore is the only adapter
-we ship and support today — we'd rather support one datastore excellently than
-five badly.
+Each adapter measures its source's **raw unit** — never a dollar bill. Firestore
+counts reads; MongoDB counts the documents your queries return. (MongoDB bills by
+cluster/compute, not per read, so "docs read" is the read *load* by feature — the
+work that sizes your cluster and the place to optimise — not your invoice.)
+
+### MongoDB
+
+Same model as Firestore: install the trap once, name your paths with `bucket()`.
+Pass the driver classes from your `mongodb` import (an optional peer dep):
+
+```ts
+import { FindCursor, AggregationCursor, Collection } from "mongodb";
+import { installMongoMeter, bucket } from "@cross-deck/buckets";
+
+installMongoMeter({ FindCursor, AggregationCursor, Collection });   // once, at startup
+
+await bucket("home-feed", async () => {
+  const posts = await db.collection("posts").find({ live: true }).toArray(); // → home-feed
+});
+```
+
+Every `find().toArray()`, `aggregate().toArray()` and `findOne()` is counted as the
+documents it returns, attributed to the bucket — observe-only (it reads the result
+already in hand, runs no `explain()` and no profiler scan, so it never becomes a read
+monster). The dashboard shows it in MongoDB's own language ("docs read").
 
 ---
 

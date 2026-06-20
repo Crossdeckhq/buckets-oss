@@ -311,6 +311,17 @@ From the next read on, that path reports as `nightly-export` instead of `col:eve
 > the unnamed bucket stops climbing. The next full day shows the path named from its
 > first hour. (Watch for the *new* name appearing — not the old bar changing colour.)
 
+> **Tagged it, but it's *still* showing untagged? You tagged the wrong path.** The
+> check after you ship is one thing: did your new name start growing while the
+> `col:*` / `unknown` bucket stopped climbing? If instead the **untagged bucket keeps
+> climbing and your name never grows**, the reads aren't flowing through the code you
+> wrapped. Remember the collection tells you *what* is read, not *where* — and the
+> same collection is usually read from several places. Re-evaluate which path actually
+> issues those reads and tag *that* one. A tell: a smooth, constant rhythm (especially
+> with nobody using the app) is a **machine** — a scheduled job or per-event
+> processing — not a person; a spiky, daytime pattern is user-driven. Let the shape
+> point you at the right path.
+
 See an `unknown` bucket you can't explain? **Drill in, wrap that path in a
 `bucket()`, ship, look again** — and keep going, coarse to fine, until the read is
 named all the way down to the line you care about. Two grains:

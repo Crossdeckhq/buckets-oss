@@ -498,9 +498,9 @@ Firestore is simply the first place it found the leak.
 
 | Datastore | Unit measured | Status |
 |---|---|---|
-| **Firestore — server** (`firebase-admin`) | reads | ✅ Supported |
-| **Firestore — browser** (`firebase` JS SDK) | reads | ✅ Supported — `@cross-deck/buckets/web` |
-| **MongoDB** (`mongodb` driver) | documents read | ✅ Supported — `installMongoMeter` |
+| **Firestore / Firebase — server** (`firebase-admin`) | reads | ✅ Supported |
+| **Firestore / Firebase — browser** (`firebase` JS SDK) | reads | ✅ Supported — `@cross-deck/buckets/web` |
+| **MongoDB** (`mongodb` driver, incl. Atlas) | documents read | ✅ Supported — `installMongoMeter` |
 | **Postgres** (`pg` driver) — incl. Supabase, Neon, Vercel Postgres, RDS | rows read | ✅ Supported — `installPgMeter` |
 | DynamoDB · Cosmos · Redis | (per-source unit) | 🔜 Adapter interface is public — contributions welcome |
 
@@ -531,7 +531,7 @@ documents it returns, attributed to the bucket — observe-only (it reads the re
 already in hand, runs no `explain()` and no profiler scan, so it never becomes a read
 monster). The dashboard shows it in MongoDB's own language ("docs read").
 
-### Postgres
+### Postgres — Supabase, Neon, Vercel Postgres, RDS
 
 One adapter covers node-postgres (`pg`) and everything built on it — Supabase, Neon,
 Vercel Postgres, Amazon RDS, and plain Postgres. Install the trap once; name your

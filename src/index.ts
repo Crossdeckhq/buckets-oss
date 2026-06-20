@@ -94,6 +94,7 @@ export {
 // instance and silently drop the counts.
 export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
 export { installMongoMeter, type MongoClasses, MONGO_READ_UNIT } from "./mongo";
+export { installPgMeter, type PgClasses, PG_READ_UNIT } from "./postgres";
 
 // The sink seam — for self-hosting rollups instead of reporting to Crossdeck.
 export {

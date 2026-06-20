@@ -26,7 +26,7 @@
  * never forces the driver on a Firestore user):
  *
  *   import { FindCursor, AggregationCursor, Collection } from "mongodb";
- *   import { installMongoMeter } from "@cross-deck/buckets/mongo";
+ *   import { installMongoMeter } from "@cross-deck/buckets";
  *   installMongoMeter({ FindCursor, AggregationCursor, Collection });
  */
 import { record, type CostHint } from "../cost-meter";

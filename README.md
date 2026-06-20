@@ -501,12 +501,14 @@ Firestore is simply the first place it found the leak.
 | **Firestore — server** (`firebase-admin`) | reads | ✅ Supported |
 | **Firestore — browser** (`firebase` JS SDK) | reads | ✅ Supported — `@cross-deck/buckets/web` |
 | **MongoDB** (`mongodb` driver) | documents read | ✅ Supported — `installMongoMeter` |
-| Postgres · DynamoDB · Cosmos | (per-source unit) | 🔜 Adapter interface is public — contributions welcome |
+| **Postgres** (`pg` driver) — incl. Supabase, Neon, Vercel Postgres, RDS | rows read | ✅ Supported — `installPgMeter` |
+| DynamoDB · Cosmos · Redis | (per-source unit) | 🔜 Adapter interface is public — contributions welcome |
 
 Each adapter measures its source's **raw unit** — never a dollar bill. Firestore
-counts reads; MongoDB counts the documents your queries return. (MongoDB bills by
-cluster/compute, not per read, so "docs read" is the read *load* by feature — the
-work that sizes your cluster and the place to optimise — not your invoice.)
+counts reads; MongoDB counts the documents your queries return; Postgres counts the
+rows your queries return. (Supabase, Neon, and RDS bill by compute — instance size ×
+hours, not per row — so "rows read" is the read *load* by feature: the work that
+sizes your instance and the place to optimise, not your invoice.)
 
 ### MongoDB
 
@@ -528,6 +530,31 @@ Every `find().toArray()`, `aggregate().toArray()` and `findOne()` is counted as 
 documents it returns, attributed to the bucket — observe-only (it reads the result
 already in hand, runs no `explain()` and no profiler scan, so it never becomes a read
 monster). The dashboard shows it in MongoDB's own language ("docs read").
+
+### Postgres
+
+One adapter covers node-postgres (`pg`) and everything built on it — Supabase, Neon,
+Vercel Postgres, Amazon RDS, and plain Postgres. Install the trap once; name your
+paths with `bucket()`. Pass the `Client` class from your `pg` import (an optional peer
+dep):
+
+```ts
+import { Client } from "pg";
+import { installPgMeter, bucket } from "@cross-deck/buckets";
+
+installPgMeter({ Client });   // once, at startup
+
+await bucket("billing-page", async () => {
+  const { rows } = await pool.query("SELECT * FROM invoices WHERE user_id = $1", [id]); // → billing-page
+});
+```
+
+Every `SELECT` is counted as the rows it returns, attributed to the bucket. One patch
+on `Client` covers a `Pool` too — `pool.query()` runs through the same client, so
+there's no double counting. Observe-only: it reads `result.rows` already in hand, runs
+no `EXPLAIN` and no `pg_stat_statements` scan, so it never becomes a read monster.
+Writes (`INSERT`/`UPDATE`/`DELETE`, even with `RETURNING`) are not reads and are not
+counted. The dashboard shows it in Postgres's own language ("rows read").
 
 ---
 

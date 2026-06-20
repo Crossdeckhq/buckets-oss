@@ -89,8 +89,11 @@ export {
   type MeterConfig,
 } from "./cost-meter";
 
-// The trap (the only datastore adapter today) + its class shape.
+// The datastore traps + their class shapes. Re-exported from THIS entry so they
+// share the meter's module-level state — a separate bundle would get its own meter
+// instance and silently drop the counts.
 export { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
+export { installMongoMeter, type MongoClasses, MONGO_READ_UNIT } from "./mongo";
 
 // The sink seam — for self-hosting rollups instead of reporting to Crossdeck.
 export {

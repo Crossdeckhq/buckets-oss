@@ -17,10 +17,36 @@ export interface CostTag {
   feature?: string;
   /** The bucket name — what `bucket()` sets. Drives the report's `byLabel`. */
   label?: string;
+  /**
+   * The ENVIRONMENT this read ran in — `server`, `web`, `dashboard`, … Stamped as
+   * the ROOT of every bucket path so a problem bucket tells you WHERE to go fix it
+   * (a backend query vs a browser listener) at a glance. Normally set once at init
+   * (the server entry defaults it to `server`); override it per async-context to
+   * carve a sub-surface out of one process — e.g. mark dashboard-originated reads
+   * `dashboard` while background jobs stay `server`.
+   */
+  surface?: string;
 }
 
 const DEFAULT_TAG: CostTag = {};
 const store = new AsyncLocalStorage<CostTag>();
+
+/** Process-wide surface set once at init (the server entry → `server`). A per-context
+ *  `surface` on the live tag overrides it for that async subtree. */
+let defaultSurface: string | undefined;
+
+/** Set the process default surface — the environment root every bucket path is
+ *  stamped with. Called by `init({ surface })`; defaults to `server` there. */
+export function setDefaultSurface(surface: string | undefined): void {
+  defaultSurface = surface || undefined;
+}
+
+/** The surface in effect right now: an explicit per-context `surface` wins, else the
+ *  process default. `undefined` until init stamps one — pre-stamp reports render under
+ *  an `unknown` environment on the dashboard, never dropped. */
+export function currentSurface(): string | undefined {
+  return store.getStore()?.surface ?? defaultSurface;
+}
 
 /** Run `fn` with `tag` bound for its entire async subtree. */
 export function runWithCostTag<T>(tag: CostTag, fn: () => T): T {

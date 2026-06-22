@@ -30,12 +30,25 @@ export interface InitWebOptions {
   flushIntervalMs?: number;
   /** Notified when a flush fails, so a dropped window is never silent. */
   onError?: WebMeterConfig["onError"];
+  /**
+   * The ENVIRONMENT this collector runs in — stamped as the ROOT of every bucket
+   * path so the dashboard shows browser vs server at a glance. Defaults to `"web"`.
+   * Override only for a more specific root (e.g. the Crossdeck dashboard passes
+   * `"dashboard"` so its own client reads read purple, distinct from a customer app's
+   * `web`).
+   */
+  surface?: string;
 }
 
 /** Configure the browser collector once, at app start. */
 export function initBucketsWeb(options: InitWebOptions): void {
   const sink = new WebReportSink({ apiKey: options.apiKey, endpoint: options.endpoint });
-  configureWebMeter({ sink, flushIntervalMs: options.flushIntervalMs, onError: options.onError });
+  configureWebMeter({
+    sink,
+    flushIntervalMs: options.flushIntervalMs,
+    onError: options.onError,
+    surface: options.surface ?? "web",
+  });
 }
 
 // The tagging verb + the metered read wrappers (swap your firebase/firestore

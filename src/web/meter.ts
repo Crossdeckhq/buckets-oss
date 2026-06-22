@@ -38,12 +38,21 @@ export interface WebMeterConfig {
   sink: Sink;
   flushIntervalMs?: number;
   onError?: (e: unknown) => void;
+  /** Environment root prepended to every label — `web` for the browser entry. */
+  surface?: string;
 }
+
+/** The environment this collector runs in (browser entry → `web`), stamped as the
+ *  ROOT of every bucket path so the dashboard shows where the read ran. */
+let surface: string | undefined;
 
 export function configureWebMeter(config: WebMeterConfig): void {
   sink = config.sink;
   if (config.flushIntervalMs && config.flushIntervalMs > 0) flushIntervalMs = config.flushIntervalMs;
   onError = config.onError ?? null;
+  // Init always passes a surface (default `web`); unconditional set means a
+  // reconfigure with none clears it rather than silently keeping a stale root.
+  surface = config.surface || undefined;
 }
 
 const utcDate = (): string => new Date().toISOString().slice(0, 10);
@@ -72,7 +81,11 @@ export function recordWeb(op: OpType, n: number, label: string): void {
   try {
     if (!Number.isFinite(n) || n <= 0) return;
     const date = utcDate();
-    const lk = date + SEP + op + SEP + label;
+    // SURFACE ROOT — prepend the environment (`web`) so every browser read shows
+    // where it ran. Pure string prepend; only the label grain carries it (the
+    // hour/minute grains are time-only). Zero extra work.
+    const full = surface ? `${surface}>${label}` : label;
+    const lk = date + SEP + op + SEP + full;
     labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + n);
     const hk = date + SEP + op + SEP + utcHour();
     hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + n);

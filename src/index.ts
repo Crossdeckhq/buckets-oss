@@ -8,6 +8,7 @@
  *   3. (the dashboard shows the rest — and names the ones you haven't yet)
  */
 import { configureMeter, type MeterConfig } from "./cost-meter";
+import { setDefaultSurface } from "./cost-context";
 import { ReportSink, NullSink, type Sink } from "./sink";
 import { MirrorSink, DEFAULT_MIRROR_DIR } from "./mirror";
 import { installFirestoreMeter, type FirestoreClasses } from "./adapters/firestore";
@@ -40,6 +41,14 @@ export interface InitOptions {
   mirror?: string | false;
   /** Notified when a flush fails, so a dropped window is never silent. Best-effort. */
   onError?: MeterConfig["onError"];
+  /**
+   * The ENVIRONMENT this collector runs in — stamped as the ROOT of every bucket
+   * path so the dashboard shows server vs browser at a glance. Defaults to
+   * `"server"` (this is the Node/server entry; the browser entry
+   * `@cross-deck/buckets/web` defaults to `"web"`). Override only for a more
+   * specific root (e.g. `"dashboard"`).
+   */
+  surface?: string;
 }
 
 /**
@@ -49,6 +58,9 @@ export interface InitOptions {
  * automatically.
  */
 export function init(options: InitOptions = {}): void {
+  // Stamp the environment root first (server entry → "server"), so every read
+  // counted after this point carries its surface. A string prepend — zero reads.
+  setDefaultSurface(options.surface ?? "server");
   // Upstream: your sink, else a Crossdeck reporter if a key was given, else nothing.
   const upstream: Sink | null =
     options.sink ?? (options.apiKey ? new ReportSink({ apiKey: options.apiKey, endpoint: options.endpoint }) : null);
@@ -71,6 +83,8 @@ export {
   enterCostTag,
   refineCostTag,
   currentCostTag,
+  setDefaultSurface,
+  currentSurface,
   type CostTag,
 } from "./cost-context";
 

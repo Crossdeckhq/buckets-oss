@@ -14,6 +14,12 @@ becoming a cost itself.
 [![Firestore](https://img.shields.io/badge/datastore-Firestore-black)](#datastore-support)
 [![Made by Crossdeck](https://img.shields.io/badge/made%20by-Crossdeck-black)](https://cross-deck.com)
 
+<br/>
+
+<img src="assets/buckets-dashboard.png" alt="The Buckets dashboard — where your reads go, before and after a fix. 12 hours after a fix shipped: reads down 44% (minus 396K per day), the hourly bars dropped green below baseline, and the 24-hour read curve flattened." width="840" />
+
+<sub><strong>Where your reads go — before and after a fix.</strong> 12h after a change shipped: reads down 44% (−396K/day), bars green below baseline, the curve bent. Live in every Crossdeck project.</sub>
+
 </div>
 
 ---

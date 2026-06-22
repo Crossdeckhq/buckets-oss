@@ -10,8 +10,8 @@ user who triggered it — automatically, with no blind spots, and without ever
 becoming a cost itself.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![npm](https://img.shields.io/badge/npm-%40cross-deck%2Fbuckets-black)](https://www.npmjs.com/package/@cross-deck/buckets)
-[![Firestore](https://img.shields.io/badge/datastore-Firestore-black)](#datastore-support)
+[![npm](https://img.shields.io/npm/v/@cross-deck/buckets?color=black&label=npm)](https://www.npmjs.com/package/@cross-deck/buckets)
+[![datastores](https://img.shields.io/badge/datastores-Firestore%20%C2%B7%20MongoDB%20%C2%B7%20Postgres-black)](#datastore-support)
 [![Made by Crossdeck](https://img.shields.io/badge/made%20by-Crossdeck-black)](https://cross-deck.com)
 
 <br/>
@@ -571,7 +571,9 @@ init({ apiKey, endpoint?, flushIntervalMs? })   // configure once; reports up to
 
 bucket(name, fn)               // ← the one verb you'll use: attribute everything inside to `name`
 
-installFirestoreMeter(classes) // the Firestore trap (the only adapter today)
+installFirestoreMeter(classes) // Firestore (server) — pass your firebase-admin classes
+installMongoMeter(classes)     // MongoDB — pass your mongodb driver classes
+installPgMeter(classes)        // Postgres (incl. Supabase, Neon, RDS) — pass your pg Client
 flush()                        // force a flush (tests / shutdown)
 
 // lower-level, if you need it:
@@ -588,9 +590,11 @@ maintained rollup → dashboard) happens automatically — you never touch it.
 ## Roadmap
 
 - [x] Core: tag · trap · meter · rollup
-- [x] Firestore adapter
+- [x] Firestore adapter (server + browser)
+- [x] MongoDB adapter
+- [x] Postgres adapter (incl. Supabase, Neon, RDS)
 - [x] Public, versioned rollup schema
-- [ ] Postgres adapter
+- [ ] DynamoDB · Cosmos · Redis adapters (the adapter interface is public — contributions welcome)
 - [ ] `compute` (invocation + CPU-ms) attribution in the public build
 - [ ] OpenTelemetry export
 - [ ] Community sink adapters (BigQuery, ClickHouse, S3)

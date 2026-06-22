@@ -1,7 +1,7 @@
 {
   "name": "@cross-deck/buckets",
-  "version": "0.10.1",
-  "description": "Know exactly what every database read costs you — and who caused it. A tiny, never-throws read-cost collector for Firestore, server AND browser.",
+  "version": "0.10.2",
+  "description": "Know exactly what every database read costs you — and who caused it. A tiny, never-throws read-cost collector for Firestore, MongoDB & Postgres — server and browser.",
   "license": "MIT",
   "author": "Crossdeck",
   "main": "./dist/index.js",
@@ -43,7 +43,11 @@
     "reads",
     "attribution",
     "finops",
-    "crossdeck"
+    "crossdeck",
+    "mongodb",
+    "postgres",
+    "supabase",
+    "neon"
   ],
   "repository": {
     "type": "git",

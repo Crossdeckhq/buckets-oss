@@ -6,7 +6,7 @@ import {
   recordFirestore,
   flush,
 } from "../src/cost-meter.js";
-import { bucket } from "../src/cost-context.js";
+import { bucket, setDefaultSurface, enterCostTag, runWithCostTag } from "../src/cost-context.js";
 import { installFirestoreMeter, __resetFirestoreMeterForTests } from "../src/adapters/firestore.js";
 import type { BucketsReport, Sink } from "../src/sink.js";
 
@@ -36,6 +36,7 @@ describe("cost-meter", () => {
   beforeEach(async () => {
     sink = new CollectingSink();
     configureMeter({ sink, onError: () => void sink.errors++ });
+    setDefaultSurface(undefined); // module-level state — reset so it can't leak between tests
     await drain(sink);
   });
 
@@ -207,5 +208,61 @@ describe("installFirestoreMeter (the trap)", () => {
     new FakeDocStream().onSnapshot(() => {});
     await flush();
     expect(sink.reports[0]!.byLabel["uncategorized"]).toEqual({ read: 2 });
+  });
+});
+
+describe("cost-meter — surface (the environment root)", () => {
+  let sink: CollectingSink;
+
+  beforeEach(async () => {
+    sink = new CollectingSink();
+    configureMeter({ sink, onError: () => void sink.errors++ });
+    setDefaultSurface(undefined);
+    await drain(sink);
+  });
+
+  it("with NO surface set, the label has no environment root (backward compatible)", async () => {
+    await bucket("home-feed", async () => recordReads(3));
+    recordReads(2, { collection: "posts" });
+    await flush();
+    const r = sink.reports[0]!;
+    expect(r.byLabel["home-feed"]).toEqual({ read: 3 }); // no prefix
+    expect(r.byLabel["col:posts"]).toEqual({ read: 2 });
+  });
+
+  it("stamps the default surface as the ROOT of every label — tagged and untagged", async () => {
+    setDefaultSurface("server");
+    await bucket("analytics", () => bucket("rollup", async () => recordReads(5, { collection: "events" })));
+    recordReads(4, { collection: "posts" }); // untagged still gets the surface root
+    recordReads(1); // nothing derivable
+    await flush();
+    const r = sink.reports[0]!;
+    expect(r.byLabel["server>analytics>rollup>col:events"]).toEqual({ read: 5 });
+    expect(r.byLabel["server>col:posts"]).toEqual({ read: 4 });
+    expect(r.byLabel["server>uncategorized"]).toEqual({ read: 1 });
+  });
+
+  it("a per-context surface overrides the process default for its async subtree", async () => {
+    setDefaultSurface("server");
+    // A dashboard-originated request carves "dashboard" out of the same server process.
+    await runWithCostTag({ surface: "dashboard" }, async () => {
+      await bucket("customer-detail", async () => recordReads(2, { collection: "events" }));
+    });
+    // Outside that scope, the default still applies.
+    recordReads(1, { collection: "events" });
+    await flush();
+    const r = sink.reports[0]!;
+    expect(r.byLabel["dashboard>customer-detail>col:events"]).toEqual({ read: 2 });
+    expect(r.byLabel["server>col:events"]).toEqual({ read: 1 });
+  });
+
+  it("enterCostTag can set the surface without a wrapping callback", async () => {
+    setDefaultSurface("server");
+    await runWithCostTag({}, async () => {
+      enterCostTag({ surface: "dashboard" });
+      recordReads(3, { collection: "users" });
+    });
+    await flush();
+    expect(sink.reports[0]!.byLabel["dashboard>col:users"]).toEqual({ read: 3 });
   });
 });

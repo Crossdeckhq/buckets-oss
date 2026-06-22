@@ -128,6 +128,14 @@ bills — labelled and reported up the **same pipe**, so your dashboard shows
 precise: **Buckets captures every read that flows through a collector** — put one
 on each surface you read from, and you see all of it.
 
+**Each collector stamps its environment.** Every bucket path is rooted at *where the
+read ran* — `server > …` from the Node collector, `web > …` from the browser one. So a
+problem bucket doesn't just tell you *which* query is bleeding, it tells you *where to go
+fix it* — a backend scan or a browser listener — at a glance. Stitch both surfaces into
+one Crossdeck view and a bucket fed from more than one place shows it. (Override the root
+with `init({ surface })` / `initBucketsWeb({ surface })` for a more specific environment,
+e.g. `dashboard`.)
+
 > We learned this the hard way dogfooding on our own dashboard: 94% of our reads
 > were browser-side and a server-only install was blind to them. The browser
 > collector is the fix — and the reason "install where you read" is the whole model.
@@ -383,7 +391,10 @@ Two honest limits come with going it alone — and they're exactly what Crossdec
 - **You see the surface you installed on.** Drop it in your server and you see server
   reads — often the *minority*. Most apps read from the browser too (a separate
   install), and the bill is the sum of both. **Crossdeck stitches server + browser +
-  every surface into one number**, so you stop reasoning from a slice.
+  every surface into one number**, so you stop reasoning from a slice — and shows you
+  **which environment each bucket bleeds from** (server vs browser vs dashboard,
+  colour-coded), so you know where to go fix it. That per-environment view is **free**
+  the moment you register and install the SDK — additional functionality, still no cost.
 - **Reading the numbers back yourself costs a few reads** — querying your own stored
   rollups is still a read. **Crossdeck maintains the summary and serves it to you free,
   live, any time** — the cost tool never costs you to look.

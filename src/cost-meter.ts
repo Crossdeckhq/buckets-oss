@@ -12,7 +12,7 @@
  * swallows its own errors; a failed flush drops that window's counts (surfaced via
  * `onError` if you pass one) rather than disturbing the app.
  */
-import { currentCostTag } from "./cost-context";
+import { currentCostTag, currentSurface } from "./cost-context";
 import type { Sink, BucketsReport, ResourceCounts } from "./sink";
 
 /**
@@ -104,11 +104,17 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     // nothing derivable → "uncategorized". A unit is never invisible, and a tagged
     // one never loses where it actually went.
     const coll = hint?.collection ? `col:${hint.collection}` : null;
-    const label = t.label
+    const base = t.label
       ? coll
         ? `${t.label}>${coll}`
         : t.label
       : coll ?? "uncategorized";
+    // SURFACE ROOT — stamp the environment (`server` / `web` / `dashboard`) as the
+    // path root so every bucket shows WHERE the read ran, not just which code issued
+    // it. A pure string prepend: zero extra reads (no-monster rule intact). Unset
+    // until init stamps one (pre-stamp reports render `unknown`, never dropped).
+    const surface = currentSurface();
+    const label = surface ? `${surface}>${base}` : base;
     // Key includes the resource, so each resource accumulates in its OWN slot.
     const lk = date + SEP + resource + SEP + label;
     labelBuffer.set(lk, (labelBuffer.get(lk) ?? 0) + quantity);

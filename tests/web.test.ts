@@ -86,6 +86,16 @@ describe("web firestore wrappers", () => {
     expect(sink.reports.length).toBe(0); // no report — zero reads counted
   });
 
+  it("stamps the configured surface as the ROOT of every label — named and collection-cascade", async () => {
+    configureWebMeter({ sink, surface: "web" });
+    await ctx.bucket("pulse-map", () => getDocs({ path: "visitors" } as any));
+    await getDocs({ path: "posts" } as any); // untagged → web>col:posts
+    await flushWeb();
+    expect(sink.reports[0]!.byLabel["web>pulse-map"]).toEqual({ read: 3 });
+    expect(sink.reports[0]!.byLabel["web>col:posts"]).toEqual({ read: 3 });
+    configureWebMeter({ sink }); // reset surface so later tests stay unprefixed
+  });
+
   it("getCountFromServer estimates ceil(count/1000), min 1", async () => {
     await getCountFromServer({ path: "events" } as any); // mock count = 2500 → 3
     await flushWeb();

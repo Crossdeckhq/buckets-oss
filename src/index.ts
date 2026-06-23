@@ -103,6 +103,11 @@ export {
   type MeterConfig,
 } from "./cost-meter";
 
+// Serverless guarantee — wrap a handler so its counts flush before the container
+// freezes (Lambda / Cloud Functions / Vercel). The keep-the-promise verb on
+// freeze-model runtimes; a no-op worth reaching for at every serverless entry.
+export { withBuckets } from "./with-buckets";
+
 // The datastore traps + their class shapes. Re-exported from THIS entry so they
 // share the meter's module-level state — a separate bundle would get its own meter
 // instance and silently drop the counts.

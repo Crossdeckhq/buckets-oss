@@ -46,26 +46,26 @@ describe("web firestore wrappers", () => {
     const snap = await getDocs(fakeQuery as any);
     expect(snap.size).toBe(3); // real result untouched
     await flushWeb();
-    expect(sink.reports[0]!.byLabel["col:posts"]).toEqual({ read: 3 });
+    expect(sink.reports[0]!.byLabel["unknown>col:posts"]).toEqual({ read: 3 });
   });
 
   it("getDoc counts 1, labelled by the parent collection", async () => {
     await getDoc({ path: "posts/abc" } as any);
     await flushWeb();
-    expect(sink.reports[0]!.byLabel["col:posts"]).toEqual({ read: 1 });
+    expect(sink.reports[0]!.byLabel["unknown>col:posts"]).toEqual({ read: 1 });
   });
 
   it("onSnapshot counts the docChanges delivered on each fire", async () => {
     onSnapshot({ path: "events" } as any, () => {});
     await flushWeb();
-    expect(sink.reports[0]!.byLabel["col:events"]).toEqual({ read: 4 });
+    expect(sink.reports[0]!.byLabel["unknown>col:events"]).toEqual({ read: 4 });
   });
 
   it("bucket() names the read instead of the collection cascade", async () => {
     await ctx.bucket("home-feed", () => getDocs({ path: "posts" } as any));
     await flushWeb();
     expect(sink.reports[0]!.byLabel["home-feed"]).toEqual({ read: 3 });
-    expect(sink.reports[0]!.byLabel["col:posts"]).toBeUndefined();
+    expect(sink.reports[0]!.byLabel["unknown>col:posts"]).toBeUndefined();
   });
 
   it("the wrapped read returns the exact real result", async () => {
@@ -76,7 +76,7 @@ describe("web firestore wrappers", () => {
   it("getDocsFromServer counts snapshot.size (a billed read)", async () => {
     await getDocsFromServer({ path: "posts" } as any);
     await flushWeb();
-    expect(sink.reports[0]!.byLabel["col:posts"]).toEqual({ read: 5 });
+    expect(sink.reports[0]!.byLabel["unknown>col:posts"]).toEqual({ read: 5 });
   });
 
   it("getDocsFromCache counts NOTHING — cache hits aren't billed", async () => {
@@ -92,13 +92,13 @@ describe("web firestore wrappers", () => {
     await getDocs({ path: "posts" } as any); // untagged → web>col:posts
     await flushWeb();
     expect(sink.reports[0]!.byLabel["web>pulse-map"]).toEqual({ read: 3 });
-    expect(sink.reports[0]!.byLabel["web>col:posts"]).toEqual({ read: 3 });
+    expect(sink.reports[0]!.byLabel["web>unknown>col:posts"]).toEqual({ read: 3 });
     configureWebMeter({ sink }); // reset surface so later tests stay unprefixed
   });
 
   it("getCountFromServer estimates ceil(count/1000), min 1", async () => {
     await getCountFromServer({ path: "events" } as any); // mock count = 2500 → 3
     await flushWeb();
-    expect(sink.reports[0]!.byLabel["col:events"]).toEqual({ read: 3 });
+    expect(sink.reports[0]!.byLabel["unknown>col:events"]).toEqual({ read: 3 });
   });
 });

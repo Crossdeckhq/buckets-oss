@@ -71,7 +71,7 @@ describe("cost-meter", () => {
     await flush();
 
     const r = sink.reports[0]!;
-    expect(r.byLabel["col:posts"]).toEqual({ read: 4 });
+    expect(r.byLabel["unknown>col:posts"]).toEqual({ read: 4 });
     expect(r.byLabel["uncategorized"]).toEqual({ read: 1 });
   });
 
@@ -227,7 +227,7 @@ describe("cost-meter — surface (the environment root)", () => {
     await flush();
     const r = sink.reports[0]!;
     expect(r.byLabel["home-feed"]).toEqual({ read: 3 }); // no prefix
-    expect(r.byLabel["col:posts"]).toEqual({ read: 2 });
+    expect(r.byLabel["unknown>col:posts"]).toEqual({ read: 2 });
   });
 
   it("stamps the default surface as the ROOT of every label — tagged and untagged", async () => {
@@ -238,7 +238,7 @@ describe("cost-meter — surface (the environment root)", () => {
     await flush();
     const r = sink.reports[0]!;
     expect(r.byLabel["server>analytics>rollup>col:events"]).toEqual({ read: 5 });
-    expect(r.byLabel["server>col:posts"]).toEqual({ read: 4 });
+    expect(r.byLabel["server>unknown>col:posts"]).toEqual({ read: 4 });
     expect(r.byLabel["server>uncategorized"]).toEqual({ read: 1 });
   });
 
@@ -253,7 +253,7 @@ describe("cost-meter — surface (the environment root)", () => {
     await flush();
     const r = sink.reports[0]!;
     expect(r.byLabel["dashboard>customer-detail>col:events"]).toEqual({ read: 2 });
-    expect(r.byLabel["server>col:events"]).toEqual({ read: 1 });
+    expect(r.byLabel["server>unknown>col:events"]).toEqual({ read: 1 });
   });
 
   it("enterCostTag can set the surface without a wrapping callback", async () => {
@@ -263,6 +263,6 @@ describe("cost-meter — surface (the environment root)", () => {
       recordReads(3, { collection: "users" });
     });
     await flush();
-    expect(sink.reports[0]!.byLabel["dashboard>col:users"]).toEqual({ read: 3 });
+    expect(sink.reports[0]!.byLabel["dashboard>unknown>col:users"]).toEqual({ read: 3 });
   });
 });

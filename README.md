@@ -6,8 +6,8 @@
 
 **Buckets is a zero-overhead cost attribution layer for your backend.**
 Every read, write, and delete is tagged to the feature that served it and the
-user who triggered it — automatically, with no blind spots, and without ever
-becoming a cost itself.
+origin that drove it — a real user vs a machine — automatically, with no blind
+spots, and without ever becoming a cost itself.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@cross-deck/buckets?color=black&label=npm)](https://www.npmjs.com/package/@cross-deck/buckets)
@@ -28,7 +28,7 @@ becoming a cost itself.
 
 You ship a feature. A week later your database bill is up 5×. Your provider's
 console shows you *one number*: **9.6M reads today.** It does not tell you which
-feature, which query, or which users are responsible. So you start guessing —
+feature, which query, or whether it's user-driven or a machine. So you start guessing —
 adding logs, bisecting deploys, staring at dashboards at 4am.
 
 We lived this. On our own product, one tile was quietly issuing 15,000 reads
@@ -171,9 +171,9 @@ and it's a stable, public schema you can read with or without this library:
 
   // the fine grain: which surface / layer spent the reads
   "byLabel": {
-    "people-feed":     { "read": 412000 },
-    "people-journey":  { "read": 3000 },
-    "col:events":      { "read": 21000 }
+    "server>people-feed":         { "read": 412000 },
+    "server>people-journey":      { "read": 3000 },
+    "server>unknown>col:events":  { "read": 21000 }
   }
 }
 ```
@@ -694,9 +694,9 @@ Your reads are unaffected — every wrapper returns the real result no matter wh
 happens inside the meter. You lose at most one ~60-second window of *counts*.
 
 **Why not just read my cloud provider's billing export?**
-Billing exports tell you the total. They can't tell you *which feature* or *which
-user* — the attribution that lets you actually fix the cost. That's the entire
-point of Buckets.
+Billing exports tell you the total. They can't tell you *which feature* or *what
+origin* (a real user vs a machine) — the attribution that lets you actually fix
+the cost. That's the entire point of Buckets.
 
 **Does it work with `firebase-functions` / serverless cold starts?**
 Yes. The meter flushes on `SIGTERM` and `beforeExit`, so a scaling-to-zero

@@ -48,22 +48,15 @@ function collLabel(ref: any): string {
       const segs = path.split("/").filter(Boolean);
       // even segment count → document path (…/coll/id); odd → collection.
       const coll = segs.length % 2 === 0 ? segs[segs.length - 2] : segs[segs.length - 1];
-      return coll ? `col:${coll}` : "uncategorized";
+      // Untagged read → LOUD `unknown>col:x` (never a silent bare collection).
+      return coll ? `unknown>col:${coll}` : "uncategorized";
     }
     const segs = ref?._query?.path?.segments;
-    if (Array.isArray(segs) && segs.length) return `col:${segs[segs.length - 1]}`;
+    if (Array.isArray(segs) && segs.length) return `unknown>col:${segs[segs.length - 1]}`;
   } catch {
     /* never throw from labelling */
   }
   return "uncategorized";
-}
-
-// The full hierarchy label: the active bucket path as trunk + the collection as
-// the LEAF beneath it (so a tagged bucket still drills into its collections).
-function labelFor(ref: any): string {
-  const b = currentLabel();
-  const c = collLabel(ref);
-  return b ? `${b}>${c}` : c;
 }
 
 function meter(label: string, n: number): void {

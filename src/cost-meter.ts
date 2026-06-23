@@ -104,11 +104,17 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     // nothing derivable → "uncategorized". A unit is never invisible, and a tagged
     // one never loses where it actually went.
     const coll = hint?.collection ? `col:${hint.collection}` : null;
+    // Untagged reads surface LOUDLY under an explicit `unknown` bucket — never
+    // dropped, never silently merged into a real bucket. Untagged-with-collection
+    // → `unknown>col:x`; nothing derivable at all → `uncategorized`. A tagged read
+    // keeps its path and the collection leaf beneath it.
     const base = t.label
       ? coll
         ? `${t.label}>${coll}`
         : t.label
-      : coll ?? "uncategorized";
+      : coll
+        ? `unknown>${coll}`
+        : "uncategorized";
     // SURFACE ROOT — stamp the environment (`server` / `web` / `dashboard`) as the
     // path root so every bucket shows WHERE the read ran, not just which code issued
     // it. A pure string prepend: zero extra reads (no-monster rule intact). Unset

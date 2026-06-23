@@ -590,6 +590,8 @@ counted. The dashboard shows it in Postgres's own language ("rows read").
 init({ apiKey, endpoint?, flushIntervalMs? })   // configure once; reports up to Crossdeck
 
 bucket(name, fn)               // ← the one verb you'll use: attribute everything inside to `name`
+withBuckets(handler)           // wrap a serverless handler — flush its counts before the freeze
+withBuckets(name, handler)     // …and attribute the whole invocation to `name`
 
 installFirestoreMeter(classes) // Firestore (server) — pass your firebase-admin classes
 installMongoMeter(classes)     // MongoDB — pass your mongodb driver classes
@@ -619,29 +621,32 @@ are **never shipped.** The reads happened and your provider billed them, but
 Buckets never saw the window. That is a blind spot, and a blind spot is the one
 thing this library promises not to have.
 
-The fix is one line: **flush before you return.**
+The fix is one wrapper — **`withBuckets`.** It flushes the meter once, in a
+`finally`, before your function returns — on success and on throw alike (the reads
+happened either way). It's transparent: it forwards every argument and `this`,
+returns your handler's value unchanged, re-throws your handler's error unchanged,
+and a flush fault can never escape into your app.
 
 ```ts
-import { bucket, flush } from "@cross-deck/buckets";
+import { withBuckets } from "@cross-deck/buckets";
 
-export const handler = async (event) => {
-  try {
-    await bucket("my-job", () => doWork(event));
-  } finally {
-    await flush();           // ship this invocation's counts before the freeze
-  }
-};
+// every read inside is counted AND shipped before the container freezes
+export const handler = withBuckets(async (event) => { /* …your db reads… */ });
+
+// optionally attribute the whole invocation to one bucket:
+export const handler = withBuckets("nightly-export", async (event) => { /* … */ });
 ```
 
-Wrap it once so you can't forget it:
+Prefer not to wrap? Call `flush()` yourself in a `finally` — same guarantee, one
+more line:
 
 ```ts
-const withBuckets = (fn) => async (...args) => {
-  try { return await fn(...args); }
-  finally { await flush(); }
-};
+import { flush } from "@cross-deck/buckets";
 
-export const handler = withBuckets(async (event) => { /* … */ });
+export const handler = async (event) => {
+  try { return await doWork(event); }
+  finally { await flush(); }   // ship this invocation's counts before the freeze
+};
 ```
 
 Rule of thumb: **if the runtime freezes or exits between invocations, call

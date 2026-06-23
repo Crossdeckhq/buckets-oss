@@ -362,6 +362,15 @@ custom analytics event you haven't named yet. You tag until you've found your
 source; the new names appear as fresh reads land, and the next full day starts
 fully named.
 
+**Not sure where to start? Ask your database.** Before you guess at what to tag,
+your datastore already ranks its own most expensive reads for you. On Firestore,
+open the Firebase console → **Firestore → Query Insights**: it lists your top
+queries by read volume, the collection each one hits, and how many documents each
+scan touches — a tagging to-do list, sorted by cost. (MongoDB: Atlas Performance
+Advisor / `$queryStats`. Postgres: `pg_stat_statements`.) Find the heaviest query
+there, find the code path that issues it, wrap *that* in a `bucket()` — and you've
+named your single most expensive read first, on the first ship.
+
 ---
 
 ## What Buckets is — and what it deliberately isn't
@@ -595,6 +604,50 @@ recordReads(n) · recordWrites(n) · recordDeletes(n)
 One import to set up, one call to install, one verb to name a path. That's the
 whole footprint. The reporting (collector → `POST /v1/buckets/report` → your
 maintained rollup → dashboard) happens automatically — you never touch it.
+
+---
+
+## Serverless: flush before the function returns
+
+Buckets counts reads in memory and ships them to your rollup on a timer
+(`flushIntervalMs`, ~once a minute). That's exactly right for a long-lived server.
+But **serverless runtimes — Cloud Functions, Lambda, Vercel, Cloud Run — _freeze_
+the container the instant your handler returns.** A frozen container runs no
+timers and fires no `beforeExit`, so any counts buffered since the last tick are
+paused with it — and on a short invocation that finishes in under a minute, they
+are **never shipped.** The reads happened and your provider billed them, but
+Buckets never saw the window. That is a blind spot, and a blind spot is the one
+thing this library promises not to have.
+
+The fix is one line: **flush before you return.**
+
+```ts
+import { bucket, flush } from "@cross-deck/buckets";
+
+export const handler = async (event) => {
+  try {
+    await bucket("my-job", () => doWork(event));
+  } finally {
+    await flush();           // ship this invocation's counts before the freeze
+  }
+};
+```
+
+Wrap it once so you can't forget it:
+
+```ts
+const withBuckets = (fn) => async (...args) => {
+  try { return await fn(...args); }
+  finally { await flush(); }
+};
+
+export const handler = withBuckets(async (event) => { /* … */ });
+```
+
+Rule of thumb: **if the runtime freezes or exits between invocations, call
+`flush()` in a `finally` at the edge of every handler** — scheduled jobs, queue
+consumers, HTTP and callable functions alike. On an always-on process (a container
+or classic Node server that stays up), the timer handles it and you don't need to.
 
 ---
 

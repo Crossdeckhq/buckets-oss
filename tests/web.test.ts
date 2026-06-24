@@ -116,6 +116,24 @@ describe("web firestore wrappers", () => {
     configureWebMeter({ sink }); // reset surface so later tests stay unprefixed
   });
 
+  it("initBucketsWeb registers the global bridge, so the web SDK can drive the actor", async () => {
+    const { initBucketsWeb } = await import("../src/web/index");
+    initBucketsWeb({ apiKey: "cd_pub_test" }); // registers the bridge as a side effect
+    try {
+      // The Crossdeck web SDK calls this global on identify() — no Buckets import.
+      const setter = (globalThis as Record<string, unknown>)["__crossdeckBucketsBridge__"] as
+        | ((ctx: { actor?: string }) => void)
+        | undefined;
+      expect(typeof setter).toBe("function");
+      setter!({ actor: "tory@biotree.bio" });
+      expect(ctx.currentActor()).toBe("tory@biotree.bio");
+      setter!({ actor: undefined }); // reset() path clears it
+      expect(ctx.currentActor()).toBeUndefined();
+    } finally {
+      configureWebMeter({ sink }); // restore the collecting sink for any later test
+    }
+  });
+
   it("getCountFromServer estimates ceil(count/1000), min 1", async () => {
     await getCountFromServer({ path: "events" } as any); // mock count = 2500 → 3
     await flushWeb();

@@ -2,6 +2,16 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.15.0] — 2026-06-24
+
+### Added
+- **The browser identity seam.** `initBucketsWeb()` now registers the same global
+  bridge (`__crossdeckBucketsBridge__`) the server entry does, mapping incoming
+  context to the session `setActor`. So the Crossdeck **web** SDK can drive WHO on
+  `identify()` (and clear it on `reset()`) without either package importing the other
+  — the browser cross-match wires itself once both are installed. A browser session is
+  single-user, so the actor is session-level, not per-request. No-op with no SDK.
+
 ## [0.14.1] — 2026-06-24
 
 ### Fixed

@@ -20,6 +20,8 @@
  */
 import { configureWebMeter, flushWeb, type WebMeterConfig } from "./meter";
 import { WebReportSink } from "./sink";
+import { setActor } from "./context";
+import { registerBucketsBridge } from "../actor-bridge";
 
 export interface InitWebOptions {
   /** The project's `cd_pub_live_` PUBLISHABLE key (safe in client code). */
@@ -48,6 +50,13 @@ export function initBucketsWeb(options: InitWebOptions): void {
     flushIntervalMs: options.flushIntervalMs,
     onError: options.onError,
     surface: options.surface ?? "web",
+  });
+  // Open the identity seam for the browser. The Crossdeck web SDK (or your own
+  // boundary) drives WHO through the same global bridge as the server — here it
+  // maps to the session actor. A browser session is single-user, so the actor is
+  // session-level (set on identify(), cleared on reset()), not per-request.
+  registerBucketsBridge((ctx) => {
+    if ("actor" in ctx) setActor(ctx.actor);
   });
 }
 

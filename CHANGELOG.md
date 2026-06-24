@@ -2,6 +2,16 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.15.2] — 2026-06-24
+
+### Docs
+- **Tip: name a whole operation at its boundary (gateway/router), not query-by-query.**
+  Wrap your route/resolver once and every read inside inherits the name — a tRPC base
+  procedure as `bucket(path, () => next())`, or an Express route as
+  `bucket("users.show", () => handler(req, res))`. An inner `bucket()` still wins, so
+  you refine only the hot paths. One change names your whole API by operation — how
+  Crossdeck names every read in its own dashboard.
+
 ## [0.15.1] — 2026-06-24
 
 ### Docs

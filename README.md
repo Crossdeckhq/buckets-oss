@@ -119,6 +119,20 @@ await bucket("pulse-map", async () => {
 });
 ```
 
+> **Tip — name a whole operation at its boundary, not query-by-query.** Wrap your
+> route/handler *once* and every read inside inherits the name; an inner `bucket()`
+> still wins, so you refine only the hot paths. Where the operation name is already on
+> hand — a gateway or router — it's a single line that names your whole API:
+> ```ts
+> // tRPC base procedure — `path` IS the operation (issues.list, revenue.portfolio)
+> .use(({ path, next }) => bucket(path, () => next()));
+>
+> // Express — name the route handler (use the route pattern, not the raw URL)
+> app.get("/users/:id", (req, res) => bucket("users.show", () => handler(req, res)));
+> ```
+> One change and your whole API shows up named by operation — no per-query tagging.
+> This is exactly how Crossdeck names every read in its own dashboard.
+
 **3. Read it back — one command, no dashboard.** Buckets writes a live readout to
 `.crossdeck/buckets.md` (biggest bucket first). Print it with one command — a plain
 file on disk, no dashboard, no account:

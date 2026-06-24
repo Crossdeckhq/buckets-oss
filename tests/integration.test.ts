@@ -16,8 +16,8 @@
  * That's the guard. The directive is the spec; this single test keeps CI cheap.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { configureMeter, recordReads, flush } from "../src/cost-meter";
-import { bucket, setDefaultSurface } from "../src/cost-context";
+import { configureMeter, recordReads, flush, ACTOR_SEP } from "../src/cost-meter";
+import { bucket, setDefaultSurface, withActor } from "../src/cost-context";
 import {
   installFirestoreMeter,
   __resetFirestoreMeterForTests,
@@ -75,6 +75,37 @@ describe("buckets — the whole spine (one integration test)", () => {
 
     // C-4: no currency token anywhere in the emitted rollup.
     expect(JSON.stringify(r)).not.toMatch(/\$|usd|dollar|"cost"|"price"|"rate"/i);
+  });
+
+  it("WHO × WHAT — reads attribute to the identified actor (the moat cross-match)", async () => {
+    // Tory Michelle logs in → her Analytics reads attribute to HER, on that feature.
+    // Only a tool that owns the SDK identity can do this; a query profiler never can.
+    await withActor("tory@biotree.bio", () =>
+      bucket("analytics", async () => recordReads(4000)),
+    );
+    // An unidentified visitor → clusters under `anonymous`, never dropped, never guessed.
+    recordReads(50, { collection: "pages" });
+
+    await flush();
+    const r = sink.reports[0]!;
+
+    // WHO — reads per identified actor, plus the honest anonymous cluster.
+    expect(r.byActor?.["tory@biotree.bio"]).toEqual({ read: 4000 });
+    expect(r.byActor?.["anonymous"]).toEqual({ read: 50 });
+    // WHO × WHAT — "Tory Michelle · Analytics · 4,000" (env-rooted label; split on ACTOR_SEP).
+    expect(r.byActorLabel?.[`tory@biotree.bio${ACTOR_SEP}server>analytics`]).toEqual({
+      read: 4000,
+    });
+    // Still raw counts only — no currency anywhere, even with the WHO dimension on.
+    expect(JSON.stringify(r)).not.toMatch(/\$|usd|dollar|"cost"|"price"|"rate"/i);
+  });
+
+  it("byActor is ABSENT until a REAL actor is seen — a pure-OSS install stays clean", async () => {
+    recordReads(10, { collection: "events" }); // no setActor anywhere → all anonymous
+    await flush();
+    const r = sink.reports[0]!;
+    expect(r.byActor).toBeUndefined(); // no all-anonymous noise
+    expect(r.byActorLabel).toBeUndefined();
   });
 
   it("safety contract — a metering failure inside the trap NEVER breaks the read", async () => {

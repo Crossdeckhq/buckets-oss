@@ -85,6 +85,12 @@ export {
   currentCostTag,
   setDefaultSurface,
   currentSurface,
+  // WHO — the identity cross-match (the moat). `setActor(id)` attributes every read
+  // in the request to an identified user; the Crossdeck SDK calls it automatically.
+  setActor,
+  withActor,
+  currentActor,
+  ACTOR_ANON,
   type CostTag,
 } from "./cost-context";
 
@@ -97,6 +103,7 @@ export {
   recordWrites,
   recordDeletes,
   flush,
+  ACTOR_SEP,
   type CostHint,
   type ResourceUnit,
   type OpType,

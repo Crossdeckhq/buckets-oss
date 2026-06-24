@@ -12,7 +12,7 @@
  * swallows its own errors; a failed flush drops that window's counts (surfaced via
  * `onError` if you pass one) rather than disturbing the app.
  */
-import { currentCostTag, currentSurface } from "./cost-context";
+import { currentCostTag, currentSurface, ACTOR_ANON } from "./cost-context";
 import type { Sink, BucketsReport, ResourceCounts } from "./sink";
 
 /**
@@ -44,6 +44,14 @@ const hourBuffer = new Map<string, number>();
  *  that lets a developer verify against the provider console's "last hour" within
  *  minutes of installing — not after a day. Still one maintained doc, zero reads. */
 const minuteBuffer = new Map<string, number>();
+/** key = date <NUL> resource <NUL> actor → count. WHO — the identity cross-match. */
+const actorBuffer = new Map<string, number>();
+/** key = date <NUL> resource <NUL> actor <NUL> label → count. WHO × WHAT (the cross). */
+const actorLabelBuffer = new Map<string, number>();
+/** Separator joining actor + label in `byActorLabel` report keys ("actor⟟label"). A
+ *  printable Unit-Separator glyph — distinct from the bucket-path `>` and unlikely in
+ *  a real actor id or label; the dashboard splits on it. */
+export const ACTOR_SEP = "␟";
 
 let sink: Sink | null = null;
 let flushIntervalMs = 60_000;
@@ -128,6 +136,15 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + quantity);
     const mk = date + SEP + resource + SEP + utcFiveMin();
     minuteBuffer.set(mk, (minuteBuffer.get(mk) ?? 0) + quantity);
+    // WHO — the identity cross-match (Buckets' moat). The request boundary set the
+    // actor (manual setActor, or the Crossdeck SDK from its identity layer); an
+    // unidentified read clusters under `anonymous`, never dropped. byActor/byActorLabel
+    // only SHIP once a real actor is seen (the flush drops an all-anonymous window).
+    const actor = t.actor || ACTOR_ANON;
+    const ak = date + SEP + resource + SEP + actor;
+    actorBuffer.set(ak, (actorBuffer.get(ak) ?? 0) + quantity);
+    const alk = ak + SEP + label;
+    actorLabelBuffer.set(alk, (actorLabelBuffer.get(alk) ?? 0) + quantity);
     ensureFlushLoop();
     if (labelBuffer.size + hourBuffer.size + minuteBuffer.size > MAX_BUFFER_KEYS) void flush();
   } catch {
@@ -175,9 +192,13 @@ export async function flush(): Promise<void> {
   const labels = new Map(labelBuffer);
   const hours = new Map(hourBuffer);
   const minutes = new Map(minuteBuffer);
+  const actors = new Map(actorBuffer);
+  const actorLabels = new Map(actorLabelBuffer);
   labelBuffer.clear();
   hourBuffer.clear();
   minuteBuffer.clear();
+  actorBuffer.clear();
+  actorLabelBuffer.clear();
 
   try {
     const byDate = new Map<string, BucketsReport>();
@@ -201,7 +222,25 @@ export async function flush(): Promise<void> {
       const [date, op, slot] = k.split(SEP) as [string, OpType, string];
       add(reportFor(date).byMinute!, slot, op, n);
     }
+    for (const [k, n] of actors) {
+      const [date, op, actor] = k.split(SEP) as [string, OpType, string];
+      add((reportFor(date).byActor ??= {}), actor, op, n);
+    }
+    for (const [k, n] of actorLabels) {
+      const [date, op, actor, label] = k.split(SEP) as [string, OpType, string, string];
+      add((reportFor(date).byActorLabel ??= {}), actor + ACTOR_SEP + label, op, n);
+    }
     for (const report of byDate.values()) {
+      // Ship the WHO dimension ONLY once a real identified actor was seen — a
+      // pure-OSS install with no identity wired must stay clean (no all-anonymous
+      // noise). The moment the SDK (or a manual setActor) names someone, it lights up.
+      if (
+        report.byActor &&
+        Object.keys(report.byActor).every((a) => a === ACTOR_ANON)
+      ) {
+        delete report.byActor;
+        delete report.byActorLabel;
+      }
       await sink.flush(report);
     }
   } catch (e) {

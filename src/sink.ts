@@ -43,6 +43,20 @@ export interface BucketsReport {
   /** UTC 5-minute slot "HHMM" (slot start) → counts. The fine grain for fast
    *  verification against a provider console's "last hour" view. */
   byMinute?: Record<string, ResourceCounts>;
+  /**
+   * WHO — reads per identified ACTOR (the SDK-identity cross-match, Buckets' moat):
+   * "this user caused these reads." Unidentified reads cluster under `anonymous`.
+   * ABSENT entirely until a real actor is seen — a pure-OSS install with no identity
+   * wired never emits it (no all-anonymous noise). Lights up when the Crossdeck SDK
+   * (or a manual `setActor()`) names the request.
+   */
+  byActor?: Record<string, ResourceCounts>;
+  /**
+   * WHO × WHAT — reads keyed `actor` + `ACTOR_SEP` + `label` ("Tory Michelle␟Analytics"):
+   * which identified user, doing which feature, cost what. The headline cross-match.
+   * Same presence rule as `byActor`. Split the key on `ACTOR_SEP` to render.
+   */
+  byActorLabel?: Record<string, ResourceCounts>;
 }
 
 /**

@@ -26,6 +26,17 @@ export interface CostTag {
    * `dashboard` while background jobs stay `server`.
    */
   surface?: string;
+  /**
+   * WHO triggered this read — the IDENTITY cross-match, Buckets' moat. Set at the
+   * request boundary: a manual `setActor()`, or AUTOMATICALLY by the Crossdeck SDK
+   * from its identity layer (the resolved customer / developer user id) the moment
+   * it identifies the request. Unset → the read clusters under `anonymous` (one
+   * honest bucket, never dropped, never guessed). This is WHO — not why
+   * (machine-vs-user) and not where (server-vs-browser) — the identified actor.
+   * Only a platform that ALSO owns the SDK identity can fill it; a standalone read
+   * tool never can. Scoped to the app: actors never cross tenants.
+   */
+  actor?: string;
 }
 
 const DEFAULT_TAG: CostTag = {};
@@ -87,4 +98,34 @@ export function bucket<T>(name: string, fn: () => T): T {
   const parent = currentCostTag().label;
   const path = parent ? `${parent}${BUCKET_SEP}${name}` : name;
   return runWithCostTag({ ...currentCostTag(), label: path }, fn);
+}
+
+/** The reads we couldn't tie to an identity — never dropped, never guessed. The
+ *  honest "we don't know who" cluster. byActor only ships once a REAL actor has
+ *  been seen, so a pure-OSS install (no identity wired) never emits noise. */
+export const ACTOR_ANON = "anonymous";
+
+/**
+ * `setActor(id)` — attribute every read in the current async context to the
+ * identified `id` (the WHO cross-match). Call it at the request boundary the
+ * instant you know who the request is for. The Crossdeck SDK calls this
+ * automatically from its identity layer (resolved customer / developer user id);
+ * call it yourself to light up WHO without the SDK. Rides the async subtree like
+ * the rest of the tag. Falsy clears back to anonymous.
+ */
+export function setActor(id: string | undefined): void {
+  const a = id || undefined;
+  const cur = store.getStore();
+  if (cur) cur.actor = a;
+  else store.enterWith({ actor: a });
+}
+
+/** Scoped form — run `fn` with `id` bound as the actor for its async subtree only. */
+export function withActor<T>(id: string, fn: () => T): T {
+  return runWithCostTag({ ...currentCostTag(), actor: id || undefined }, fn);
+}
+
+/** The actor in effect right now, or `undefined` (→ `anonymous` at the meter). */
+export function currentActor(): string | undefined {
+  return store.getStore()?.actor;
 }

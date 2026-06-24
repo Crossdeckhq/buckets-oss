@@ -34,3 +34,21 @@ export function bucket<T>(name: string, fn: () => T): T {
     current = prev;
   }
 }
+
+// WHO — the identity cross-match (Buckets' moat) in the browser. A tab is ONE user,
+// so unlike the bucket label (per-read, synchronous) the actor is a single
+// session-level value: set it once when you know who's logged in, and every read
+// for the rest of the session attributes to them. The Crossdeck web SDK calls
+// `setActor` automatically from its identity layer on `identify()`.
+let actorId: string | undefined;
+
+/** Attribute every read in this browser session to the identified `id`. Call once
+ *  on login/identify (the Crossdeck SDK does it for you); falsy clears to anonymous. */
+export function setActor(id: string | undefined): void {
+  actorId = id || undefined;
+}
+
+/** The actor in effect now, or `undefined` (→ `anonymous` at the meter). */
+export function currentActor(): string | undefined {
+  return actorId;
+}

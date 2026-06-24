@@ -53,7 +53,8 @@ export function initBucketsWeb(options: InitWebOptions): void {
 
 // The tagging verb + the metered read wrappers (swap your firebase/firestore
 // import for these). Cache-only reads pass through uncounted (they aren't billed).
-export { bucket } from "./context";
+export { bucket, setActor, currentActor } from "./context";
+export { ACTOR_ANON } from "../constants";
 export {
   getDoc,
   getDocs,

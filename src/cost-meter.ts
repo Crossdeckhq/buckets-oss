@@ -12,8 +12,12 @@
  * swallows its own errors; a failed flush drops that window's counts (surfaced via
  * `onError` if you pass one) rather than disturbing the app.
  */
-import { currentCostTag, currentSurface, ACTOR_ANON } from "./cost-context";
+import { currentCostTag, currentSurface } from "./cost-context";
+import { ACTOR_ANON, ACTOR_SEP } from "./constants";
 import type { Sink, BucketsReport, ResourceCounts } from "./sink";
+
+// Re-export so existing `import { ACTOR_SEP } from "./cost-meter"` keeps working.
+export { ACTOR_SEP } from "./constants";
 
 /**
  * A resource unit — what an adapter counts. Firestore emits `read`/`write`/
@@ -48,10 +52,6 @@ const minuteBuffer = new Map<string, number>();
 const actorBuffer = new Map<string, number>();
 /** key = date <NUL> resource <NUL> actor <NUL> label → count. WHO × WHAT (the cross). */
 const actorLabelBuffer = new Map<string, number>();
-/** Separator joining actor + label in `byActorLabel` report keys ("actor⟟label"). A
- *  printable Unit-Separator glyph — distinct from the bucket-path `>` and unlikely in
- *  a real actor id or label; the dashboard splits on it. */
-export const ACTOR_SEP = "␟";
 
 let sink: Sink | null = null;
 let flushIntervalMs = 60_000;

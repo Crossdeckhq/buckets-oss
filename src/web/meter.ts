@@ -10,6 +10,8 @@
  *    identical and the same ingest receives both.
  */
 import type { Sink, BucketsReport, OpCounts } from "../sink";
+import { ACTOR_ANON, ACTOR_SEP } from "../constants";
+import { currentActor } from "./context";
 
 // A resource unit. The browser Firestore adapter records "read"; kept generic so
 // each resource stays distinct and is never merged with another.
@@ -25,6 +27,10 @@ const labelBuffer = new Map<string, number>();
 const hourBuffer = new Map<string, number>();
 /** key = date <US> op <US> 5-min-slot ("HHMM") → count — fast-verification grain. */
 const minuteBuffer = new Map<string, number>();
+/** key = date <US> op <US> actor → count. WHO — the identity cross-match. */
+const actorBuffer = new Map<string, number>();
+/** key = date <US> op <US> actor <US> label → count. WHO × WHAT (the cross). */
+const actorLabelBuffer = new Map<string, number>();
 
 let sink: Sink | null = null;
 let flushIntervalMs = 60_000;
@@ -91,6 +97,14 @@ export function recordWeb(op: OpType, n: number, label: string): void {
     hourBuffer.set(hk, (hourBuffer.get(hk) ?? 0) + n);
     const mk = date + SEP + op + SEP + utcFiveMin();
     minuteBuffer.set(mk, (minuteBuffer.get(mk) ?? 0) + n);
+    // WHO — the identity cross-match. The session actor (set once via setActor, or
+    // by the Crossdeck web SDK on identify); unidentified → anonymous. byActor only
+    // ships once a real actor is seen (the flush drops an all-anonymous window).
+    const actor = currentActor() || ACTOR_ANON;
+    const ak = date + SEP + op + SEP + actor;
+    actorBuffer.set(ak, (actorBuffer.get(ak) ?? 0) + n);
+    const alk = ak + SEP + full;
+    actorLabelBuffer.set(alk, (actorLabelBuffer.get(alk) ?? 0) + n);
     ensureLoop();
     if (labelBuffer.size + hourBuffer.size + minuteBuffer.size > MAX_BUFFER_KEYS) void flushWeb();
   } catch {
@@ -118,9 +132,13 @@ export async function flushWeb(): Promise<void> {
   const labels = new Map(labelBuffer);
   const hours = new Map(hourBuffer);
   const minutes = new Map(minuteBuffer);
+  const actors = new Map(actorBuffer);
+  const actorLabels = new Map(actorLabelBuffer);
   labelBuffer.clear();
   hourBuffer.clear();
   minuteBuffer.clear();
+  actorBuffer.clear();
+  actorLabelBuffer.clear();
 
   try {
     const byDate = new Map<string, BucketsReport>();
@@ -144,7 +162,24 @@ export async function flushWeb(): Promise<void> {
       const [date, op, slot] = k.split(SEP) as [string, OpType, string];
       add(reportFor(date).byMinute!, slot, op, n);
     }
+    for (const [k, n] of actors) {
+      const [date, op, actor] = k.split(SEP) as [string, OpType, string];
+      add((reportFor(date).byActor ??= {}), actor, op, n);
+    }
+    for (const [k, n] of actorLabels) {
+      const [date, op, actor, label] = k.split(SEP) as [string, OpType, string, string];
+      add((reportFor(date).byActorLabel ??= {}), actor + ACTOR_SEP + label, op, n);
+    }
     for (const report of byDate.values()) {
+      // Ship WHO only once a real actor is seen — a pure-OSS browser install with no
+      // identity wired stays clean (no all-anonymous noise).
+      if (
+        report.byActor &&
+        Object.keys(report.byActor).every((a) => a === ACTOR_ANON)
+      ) {
+        delete report.byActor;
+        delete report.byActorLabel;
+      }
       await sink.flush(report);
     }
   } catch (e) {

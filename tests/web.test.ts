@@ -68,6 +68,26 @@ describe("web firestore wrappers", () => {
     expect(sink.reports[0]!.byLabel["unknown>col:posts"]).toBeUndefined();
   });
 
+  it("setActor attributes browser reads to the identified session user (WHO × WHAT)", async () => {
+    const { ACTOR_SEP } = await import("../src/constants");
+    ctx.setActor("tory@biotree.bio"); // the web SDK calls this on identify()
+    try {
+      await ctx.bucket("analytics", () => getDocs({ path: "events" } as any)); // 3 reads
+      await flushWeb();
+      const r = sink.reports[0]!;
+      expect(r.byActor?.["tory@biotree.bio"]).toEqual({ read: 3 });
+      expect(r.byActorLabel?.[`tory@biotree.bio${ACTOR_SEP}analytics`]).toEqual({ read: 3 });
+    } finally {
+      ctx.setActor(undefined); // session value — clear so it can't leak to other tests
+    }
+  });
+
+  it("byActor is absent for an anonymous browser session (no setActor)", async () => {
+    await getDocs({ path: "posts" } as any);
+    await flushWeb();
+    expect(sink.reports[0]!.byActor).toBeUndefined();
+  });
+
   it("the wrapped read returns the exact real result", async () => {
     const out = await getDoc({ path: "x/y" } as any);
     expect(out.id).toBe("x");

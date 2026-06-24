@@ -100,10 +100,9 @@ export function bucket<T>(name: string, fn: () => T): T {
   return runWithCostTag({ ...currentCostTag(), label: path }, fn);
 }
 
-/** The reads we couldn't tie to an identity — never dropped, never guessed. The
- *  honest "we don't know who" cluster. byActor only ships once a REAL actor has
- *  been seen, so a pure-OSS install (no identity wired) never emits noise. */
-export const ACTOR_ANON = "anonymous";
+/** The unidentified-reads cluster — re-exported from the dependency-free constants
+ *  so server + browser share one value. See `constants.ts`. */
+export { ACTOR_ANON } from "./constants";
 
 /**
  * `setActor(id)` — attribute every read in the current async context to the

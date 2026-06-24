@@ -75,6 +75,11 @@ export class MirrorSink implements Sink {
       mergeInto(this.acc.byLabel, report.byLabel);
       mergeInto((this.acc.byHour ??= {}), report.byHour);
       mergeInto((this.acc.byMinute ??= {}), report.byMinute);
+      // WHO × WHAT — carry the cross-match into the local readout too. Only when
+      // present: the meter already drops an all-anonymous window, so a pure-OSS
+      // install with no setActor never grows these and the readout stays clean.
+      if (report.byActor) mergeInto((this.acc.byActor ??= {}), report.byActor);
+      if (report.byActorLabel) mergeInto((this.acc.byActorLabel ??= {}), report.byActorLabel);
 
       mkdirSync(this.dir, { recursive: true });
       writeFileSync(join(this.dir, "buckets.md"), renderReadout(this.acc));

@@ -2,6 +2,24 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.14.1] — 2026-06-24
+
+### Fixed
+- **The local readout silently dropped the cross-match.** `MirrorSink` accumulated
+  only `byLabel`/`byHour`/`byMinute`, so `byActor`/`byActorLabel` never reached
+  `.crossdeck/buckets.json` or `.md` — `npx @cross-deck/buckets` showed the bucket
+  table but **never the `Who caused the reads` / `Who × what` sections**, the headline
+  feature, for anyone running the OSS collector locally. The mirror now carries both
+  actor maps through (only when present, so a pure-OSS no-`setActor` readout stays
+  clean). Regression test added (`tests/mirror.test.ts`).
+
+### Docs
+- **Quickstart now leads with a 30-second, no-database demo** — install, run one
+  throwaway script, `npx` — so a newcomer sees the full readout (buckets + WHO × WHAT)
+  before wiring anything. Added an explicit **"Seeing `No readout`?"** note explaining
+  the empty state (app must run + read its DB; counts flush ~1/min; run `npx` from the
+  app's folder; `flush()` to force it) — the exact dead-end a first-time user hits.
+
 ## [0.14.0] — 2026-06-24
 
 ### Added

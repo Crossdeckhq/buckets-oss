@@ -48,6 +48,43 @@ Buckets fixes this by construction.
 
 ## Quickstart
 
+### See it first — 30 seconds, no database to wire
+
+Before instrumenting a real app, watch the readout appear from a throwaway script.
+Install the package, drop in this file, run it, and read it back:
+
+```bash
+npm install @cross-deck/buckets
+```
+
+`buckets-demo.mjs`:
+
+```js
+import { init, bucket, setActor, recordReads, flush } from "@cross-deck/buckets";
+
+init();                          // meter locally + write the readout — no key, no account
+setActor("user_847");            // who's behind this request — the one-line cross-match
+
+await bucket("analytics-dashboard", async () => recordReads(31800)); // pretend these
+await bucket("pulse-map",          async () => recordReads(9400));    // came from your DB
+
+setActor("machine");                                                  // a background job
+await bucket("nightly-export",     async () => recordReads(12940));
+
+await flush();                   // force the ~once-a-minute flush so you can look right now
+```
+
+```bash
+node buckets-demo.mjs
+npx @cross-deck/buckets
+```
+
+You'll see your buckets ranked biggest-first, **Who caused the reads**, and **Who ×
+what — which user's which function**. That's the whole product on one screen. Now wire
+it to your real database 👇
+
+### Wire it to your app
+
 ```bash
 npm install @cross-deck/buckets
 ```
@@ -100,6 +137,14 @@ npx @cross-deck/buckets
 | headline-counters |   ✓   |   31K |
 | subscriptions     |   —   |  1.1K |
 ```
+
+> **Seeing `No readout at .crossdeck/buckets.json`?** That's expected, not a bug. The
+> file only appears once **two** things have happened: (1) your app actually *ran* and
+> *read its database*, and (2) the first flush landed — buffered counts ship about once
+> a minute. Run `npx` from the **same folder your app runs in** (the readout is written
+> to `./.crossdeck/`). No traffic yet means nothing to show. To see it instantly without
+> waiting for the timer, call `flush()` once (or wrap serverless handlers with
+> `withBuckets` — [Serverless](#serverless-flush-before-you-return)).
 
 **No Crossdeck key needed for any of that.** `init()` with no `apiKey` meters locally
 and writes the readout — the free, no-account wedge. Add a key and it *also* reports

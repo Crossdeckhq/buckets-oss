@@ -5,9 +5,11 @@
 ### Know exactly what every database read costs you — and who caused it.
 
 **Buckets is a zero-overhead cost attribution layer for your backend.**
-Every read, write, and delete is tagged to the feature that served it and the
-origin that drove it — a real user vs a machine — automatically, with no blind
-spots, and without ever becoming a cost itself.
+Every read, write, and delete is cross-matched to the **function** that spent it and
+the **user** who triggered it — from the identity you already have, with no blind
+spots, and without ever becoming a cost itself. Work no person caused (a cron, a queue
+consumer) attributes to `machine`, still by tenant. It's the one thing a query profiler
+structurally cannot do: show you not just the slow query, but *whose* it was.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@cross-deck/buckets?color=black&label=npm)](https://www.npmjs.com/package/@cross-deck/buckets)
@@ -80,9 +82,14 @@ await bucket("pulse-map", async () => {
 });
 ```
 
-**3. Read it back — right where you code.** Buckets writes a live readout to
-`.crossdeck/buckets.md` (biggest bucket first). Open it, or just ask your AI session
-**"read me my buckets"** — it's a plain file on disk, no dashboard required:
+**3. Read it back — one command, no dashboard.** Buckets writes a live readout to
+`.crossdeck/buckets.md` (biggest bucket first). Print it with one command — a plain
+file on disk, no dashboard, no account:
+
+```bash
+npx @cross-deck/buckets
+```
+
 
 ```
 # Buckets — reads on this surface
@@ -100,6 +107,54 @@ up so the same numbers surface on your dashboard, with the drill-down, before/af
 and read-spike alerts. (Set `mirror: false` to turn the local file off.)
 
 ---
+
+## Who caused it — reads by user, by function
+
+A query profiler shows you a slow query. It can't show you *which of your users* ran
+it — it has no idea who your users are. Buckets does, because **you** do. Tell it who's
+behind the request — one line, with the id already in your session — and every read
+cross-matches to the person and the function that spent it:
+
+```ts
+import { setActor } from "@cross-deck/buckets";
+
+// at your request boundary, the instant you know who it is:
+setActor(req.user.id);
+```
+
+That's the whole wiring. The **function** is captured where the read runs; the **user**
+from that one line. Run `npx @cross-deck/buckets` and the readout gains two sections:
+
+```
+## Who caused the reads
+| user      | reads |
+| user_847  |   38K |
+| machine   |  115K |     ← background jobs: no person, still attributable by tenant
+
+## Who × what — which user's which function
+| user_847  | analytics-refresh | 38K |
+| machine   | nightly-reconcile | 115K |
+```
+
+**Two independent axes, kept distinct.** *Who* caused the reads, and *who × which
+function*. The actor wire alone splits your unattributed pile by person — how much is a
+real user versus a background job — which is immediately actionable; putting clean
+function names on the rest is the separate tagging work [below](#from-unknown-to-named--tagging).
+
+**The function is the cost driver, not the page.** Reads attribute to the *operation*
+that spent them — the handler or route they ran in — because one page can fire six
+operations and only one is the monster. No identity on the request → a clean
+`anonymous` cluster, never dropped, never guessed.
+
+**`machine` keeps the customer.** A cron reconciling tenant data has no person — it
+honestly shows as `machine` — but it still carries the tenant it ran for. You keep
+per-customer cost on background work and drop *only* the person dimension, because no
+person caused it.
+
+No standalone read tool can do this — Query Insights, `pg_stat_statements`, an APM all
+show you a query, never a user. In Buckets it's **free, no account.** Crossdeck (also
+free until your app crosses a revenue threshold) hosts it, stitches server + browser,
+and pages you when a user's reads spike.
 
 ## Serverless — wrap your handlers (or counts vanish on freeze)
 
@@ -314,10 +369,11 @@ drops one window of counts rather than risk corrupting anything.
 
 Be precise, because the difference matters: **the trap guarantees every read is
 *caught* and labeled by its collection — none is ever silent.** Sorting a read into
-a *feature* and an *origin* ("this was the pulse-map, on a user's behalf") requires a
-tag set at the request boundary. A read that runs outside any tagged context is
-still caught and still labeled by collection (`col:events`) and project — it simply
-lands in the **`unknown`** origin until you tag that entry point.
+a named *function* (`analytics-refresh`) comes from an explicit `bucket()` — or the
+SDK's autocaptured operation — and the *user* from `setActor` at the request boundary.
+A read that runs outside any of that is still caught and still labeled by collection
+(`col:events`) and project — it simply lands in **`unknown`** (and `anonymous`) until
+you name that entry point.
 
 `unknown` is **first-class and loud**, never folded away and never filtered out of
 the surface. A growing `unknown` bucket is the meter telling you "there's a real
@@ -406,8 +462,8 @@ Buckets is **telemetry, done right.** It tells you *what* your costs are and
 *exactly where they come from.* It does **not** tell you *why* a number changed or
 *what to do about it* — and that restraint is intentional.
 
-The labels Buckets emits are deliberately low-level: the collection, the feature,
-the origin, the count. **It will never write an interpretation** — no
+The labels Buckets emits are deliberately low-level: the collection, the function,
+the user, the count. **It will never write an interpretation** — no
 `scan-on-load`, no `regression`, no `anomaly`. Those are judgements, and judgement
 is a separate concern that lives in a separate layer.
 
@@ -617,6 +673,7 @@ counted. The dashboard shows it in Postgres's own language ("rows read").
 init({ apiKey, endpoint?, flushIntervalMs? })   // configure once; reports up to Crossdeck
 
 bucket(name, fn)               // ← the one verb you'll use: attribute everything inside to `name`
+setActor(userId)               // WHO — attribute reads to the user you already have in session
 withBuckets(handler)           // wrap a serverless handler — flush its counts before the freeze
 withBuckets(name, handler)     // …and attribute the whole invocation to `name`
 
@@ -721,9 +778,9 @@ Your reads are unaffected — every wrapper returns the real result no matter wh
 happens inside the meter. You lose at most one ~60-second window of *counts*.
 
 **Why not just read my cloud provider's billing export?**
-Billing exports tell you the total. They can't tell you *which feature* or *what
-origin* (a real user vs a machine) — the attribution that lets you actually fix
-the cost. That's the entire point of Buckets.
+Billing exports tell you the total. They can't tell you *which function* or *which
+user* — the attribution that lets you actually fix the cost. That's the entire point
+of Buckets.
 
 **Does it work with `firebase-functions` / serverless cold starts?**
 Yes. The meter flushes on `SIGTERM` and `beforeExit`, so a scaling-to-zero

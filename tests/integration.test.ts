@@ -17,7 +17,18 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { configureMeter, recordReads, flush, ACTOR_SEP } from "../src/cost-meter";
-import { bucket, setDefaultSurface, withActor } from "../src/cost-context";
+import {
+  bucket,
+  setDefaultSurface,
+  withActor,
+  runWithCostTag,
+  setRequestContext,
+} from "../src/cost-context";
+import {
+  registerBucketsBridge,
+  bridgeRequest,
+  type RequestContext,
+} from "../src/actor-bridge";
 import {
   installFirestoreMeter,
   __resetFirestoreMeterForTests,
@@ -106,6 +117,50 @@ describe("buckets — the whole spine (one integration test)", () => {
     const r = sink.reports[0]!;
     expect(r.byActor).toBeUndefined(); // no all-anonymous noise
     expect(r.byActorLabel).toBeUndefined();
+  });
+
+  it("WHAT is feature-first: the operation outranks the page; collection is the leaf", async () => {
+    // The boundary knows WHO + the autocaptured OPERATION + the page — set them as the
+    // SDK bridge does, scoped to this request's context.
+    await runWithCostTag({}, async () => {
+      setRequestContext({
+        actor: "tory@biotree.bio",
+        feature: "analytics-refresh", // the cost driver (operation)
+        route: "/analytics", // page — should NOT win over the operation
+      });
+      recordReads(4000, { collection: "events" });
+    });
+    await flush();
+    const r = sink.reports[0]!;
+    // WHAT = the OPERATION, with the collection as the drillable leaf, env-rooted —
+    // NOT the page, NOT the bare collection.
+    expect(r.byLabel["server>analytics-refresh>col:events"]).toEqual({ read: 4000 });
+    // WHO × WHAT — "Tory · analytics-refresh".
+    expect(
+      r.byActorLabel?.[`tory@biotree.bio${ACTOR_SEP}server>analytics-refresh>col:events`],
+    ).toEqual({ read: 4000 });
+  });
+
+  it("WHAT falls back: route when no operation, then the collection floor", async () => {
+    await runWithCostTag({}, async () => {
+      setRequestContext({ route: "/dashboard" }); // page known, operation not
+      recordReads(7, { collection: "pages" });
+    });
+    await flush();
+    expect(sink.reports[0]!.byLabel["server>/dashboard>col:pages"]).toEqual({ read: 7 });
+
+    sink.reports.length = 0;
+    recordReads(3, { collection: "events" }); // nothing known → the floor
+    await flush();
+    expect(sink.reports[0]!.byLabel["server>unknown>col:events"]).toEqual({ read: 3 });
+  });
+
+  it("the bridge is the decoupled seam — registerBucketsBridge ↔ bridgeRequest (no import either way)", () => {
+    const calls: RequestContext[] = [];
+    registerBucketsBridge((ctx) => calls.push(ctx));
+    bridgeRequest({ actor: "u1", feature: "search" }); // what the SDK calls
+    expect(calls).toEqual([{ actor: "u1", feature: "search" }]);
+    bridgeRequest(undefined as unknown as RequestContext); // never throws on junk
   });
 
   it("safety contract — a metering failure inside the trap NEVER breaks the read", async () => {

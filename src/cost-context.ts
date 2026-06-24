@@ -13,9 +13,22 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface CostTag {
-  /** Optional coarse grouping (a caller-defined surface name). */
+  /**
+   * The OPERATION that caused the read — WHAT the user actually DID ("analytics-refresh"),
+   * the cost driver. Cost binds to the operation, not the page: loading a screen may cost
+   * nothing; the refresh/search/export ON it is what hits the database. The Crossdeck SDK
+   * autocaptures this and propagates it; it is the PRIMARY automatic WHAT, ranked above the
+   * page. Set ONLY when readable — a junk/opaque value is left unset so the WHAT falls back
+   * to the page rather than showing garbage.
+   */
   feature?: string;
-  /** The bucket name — what `bucket()` sets. Drives the report's `byLabel`. */
+  /**
+   * The PAGE / route the read happened on ("/analytics") — secondary, deducible context.
+   * Used as the WHAT only when no operation (`feature`) is present. The SDK autocaptures it.
+   */
+  route?: string;
+  /** The bucket name — what an explicit `bucket()` sets. The dev's DELIBERATE tag (the
+   *  "I suspect this feature is the monster" escape hatch); overrides feature/route. */
   label?: string;
   /**
    * The ENVIRONMENT this read ran in — `server`, `web`, `dashboard`, … Stamped as
@@ -127,4 +140,31 @@ export function withActor<T>(id: string, fn: () => T): T {
 /** The actor in effect right now, or `undefined` (→ `anonymous` at the meter). */
 export function currentActor(): string | undefined {
   return store.getStore()?.actor;
+}
+
+/**
+ * Set the request's WHO + WHAT on the CURRENT async context in one call — what the
+ * Crossdeck SDK drives via the bridge at the request boundary (`registerBucketsBridge`
+ * wires this in). Establishes a context if none is bound, so it works even outside a
+ * wrapped handler. Only PROVIDED fields are written (an omitted field is left as-is; an
+ * empty string clears it). `feature` is the operation, `route` the page — the meter
+ * resolves WHAT as label ?? feature ?? route ?? collection.
+ */
+export function setRequestContext(ctx: {
+  actor?: string;
+  feature?: string;
+  route?: string;
+}): void {
+  const apply = (tag: CostTag): void => {
+    if (ctx.actor !== undefined) tag.actor = ctx.actor || undefined;
+    if (ctx.feature !== undefined) tag.feature = ctx.feature || undefined;
+    if (ctx.route !== undefined) tag.route = ctx.route || undefined;
+  };
+  const cur = store.getStore();
+  if (cur) apply(cur);
+  else {
+    const tag: CostTag = {};
+    apply(tag);
+    store.enterWith(tag);
+  }
 }

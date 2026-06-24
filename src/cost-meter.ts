@@ -112,14 +112,21 @@ export function record(resource: ResourceUnit, quantity: number, hint?: CostHint
     // nothing derivable → "uncategorized". A unit is never invisible, and a tagged
     // one never loses where it actually went.
     const coll = hint?.collection ? `col:${hint.collection}` : null;
+    // WHAT — feature-first precedence. Cost binds to the OPERATION, not the page:
+    //   1. an explicit bucket() `label` — the dev's deliberate tag (escape hatch);
+    //   2. else `feature` — the SDK-autocaptured operation (the cost driver);
+    //   3. else `route` — the page, as deducible context;
+    //   4. else the collection cascade.
+    // The collection stays as the LEAF beneath whichever WHAT we resolved, so a named
+    // operation still drills down to which collection it read.
+    const what = t.label || t.feature || t.route || null;
     // Untagged reads surface LOUDLY under an explicit `unknown` bucket — never
     // dropped, never silently merged into a real bucket. Untagged-with-collection
-    // → `unknown>col:x`; nothing derivable at all → `uncategorized`. A tagged read
-    // keeps its path and the collection leaf beneath it.
-    const base = t.label
+    // → `unknown>col:x`; nothing derivable at all → `uncategorized`.
+    const base = what
       ? coll
-        ? `${t.label}>${coll}`
-        : t.label
+        ? `${what}>${coll}`
+        : what
       : coll
         ? `unknown>${coll}`
         : "uncategorized";

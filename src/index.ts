@@ -36,7 +36,7 @@ export interface InitOptions {
   /** Bring your own sink (self-host the rollups). Defaults to reporting up to Crossdeck. */
   sink?: Sink;
   /**
-   * Where to write the local readout — the file "read me my buckets" reads back.
+   * Where to write the local readout — the file `npx @cross-deck/buckets` prints.
    * Defaults to `.crossdeck`. Pass `false` to turn the local mirror off entirely.
    */
   mirror?: string | false;
@@ -148,6 +148,6 @@ export {
   type ReportSinkConfig,
 } from "./sink";
 
-// The local readout — the file "read me my buckets" reads back, and its renderer.
+// The local readout — the file `npx @cross-deck/buckets` prints, and its renderer.
 export { MirrorSink, DEFAULT_MIRROR_DIR } from "./mirror";
 export { renderReadout, READOUT_FOOTER } from "./readout";

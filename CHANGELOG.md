@@ -2,6 +2,16 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.1] — 2026-06-24
+
+### Docs
+- **New prominent "Serverless — wrap your handlers" section.** `withBuckets` was only a
+  one-line API-reference note; serverless wrapping is load-bearing for the ~99%-capture
+  promise, so it's now a first-class step: the freeze-loses-counts problem in plain terms,
+  the one-line `withBuckets` fix (zero added cost — uses CPU already billed, no instance
+  kept awake), and the **adapter-agnostic** point — one wrap flushes the *meter*, covering
+  Firestore / MongoDB / Postgres at once, never any single datastore. No code change.
+
 ## [0.13.0] — 2026-06-23
 
 ### Changed

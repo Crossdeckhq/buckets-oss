@@ -33,6 +33,29 @@ describe("renderReadout", () => {
     expect(md).toContain("headline-counters › subscriptions");
   });
 
+  it("renders WHO and WHO × WHAT when an actor is present (the cross-match)", async () => {
+    const { ACTOR_SEP } = await import("../src/constants");
+    const r = report({ "server>analytics>col:events": { read: 4000 } });
+    r.byActor = { "wes": { read: 4000 }, "machine": { read: 9000 } };
+    r.byActorLabel = {
+      [`wes${ACTOR_SEP}server>analytics>col:events`]: { read: 4000 },
+      [`machine${ACTOR_SEP}server>unknown>col:events`]: { read: 9000 },
+    };
+    const md = renderReadout(r);
+    expect(md).toContain("## Who caused the reads");
+    expect(md).toMatch(/\| wes \| 4\.0K \|/);
+    expect(md).toMatch(/\| machine \| 9\.0K \|/); // background work keeps a (machine) actor
+    expect(md).toContain("## Who × what");
+    // WHO × WHAT: the user and the function, split on ACTOR_SEP, col: stripped.
+    expect(md).toMatch(/\| wes \| server › analytics › events \| 4\.0K \|/);
+  });
+
+  it("omits the WHO sections entirely when no actor was set (pure-OSS readout stays clean)", () => {
+    const md = renderReadout(report({ "server>unknown>col:events": { read: 10 } }));
+    expect(md).not.toContain("Who caused the reads");
+    expect(md).not.toContain("Who × what");
+  });
+
   it("always ends with the exact Crossdeck footer — no invented numbers", () => {
     const md = renderReadout(report({ "col:events": { read: 10 } }));
     expect(md.trimEnd().endsWith(READOUT_FOOTER)).toBe(true);

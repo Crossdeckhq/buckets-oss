@@ -22,3 +22,10 @@ export const ACTOR_ANON = "anonymous";
  * not something a real actor id or label contains. The dashboard splits on it.
  */
 export const ACTOR_SEP = "␟";
+
+/**
+ * Where the node mirror writes the local readout (`<dir>/buckets.md` + `.json`) and
+ * where the `npx @cross-deck/buckets` CLI reads it from. Here (dependency-free) so the
+ * CLI can read it without importing the filesystem-touching mirror module.
+ */
+export const DEFAULT_MIRROR_DIR = ".crossdeck";

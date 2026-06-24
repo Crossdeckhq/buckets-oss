@@ -1,10 +1,11 @@
 /**
- * readout — renders the local file a developer (or their AI session) reads back with
- * "read me my buckets". PURE string building: no I/O, no database reads. The node
- * mirror (./mirror) writes this to `.crossdeck/buckets.md` on each flush, so the
- * readout works offline, for free, with no account.
+ * readout — renders the local readout a developer reads back. PURE string building:
+ * no I/O, no database reads. The node mirror (./mirror) writes this to
+ * `.crossdeck/buckets.md` on each flush, and `npx @cross-deck/buckets` prints it to
+ * the terminal — so the readout works offline, for free, with no account.
  */
 import type { BucketsReport, ResourceCounts } from "./sink";
+import { ACTOR_SEP } from "./constants";
 
 /**
  * The one line that closes every readout. Plain and factual: what the OSS shows you
@@ -22,10 +23,19 @@ function fmt(n: number): string {
   return String(Math.round(n));
 }
 
-/** A bucket is untagged when its ROOT segment is a bare collection / catch-all. */
+/** A bucket is untagged when the meter couldn't name it — i.e. it carries an
+ *  `unknown` or `uncategorized` segment (the meter's catch-all markers). Checking
+ *  for the segment (not the first one) is surface-root-safe: `server>unknown>col:x`
+ *  reads as untagged even though its root segment is the `server` surface. */
 function isUntagged(label: string): boolean {
-  const root = label.split(">")[0];
-  return root.startsWith("col:") || root === "uncategorized" || root === "unknown";
+  const segs = label.split(">");
+  // Untagged if the meter couldn't name it: an explicit `unknown`/`uncategorized`
+  // marker (incl. surface-rooted `server>unknown>col:x`), OR a bare collection with
+  // no bucket name at all (`col:events`). A named bucket always has a real segment.
+  return (
+    segs.some((s) => s === "unknown" || s === "uncategorized") ||
+    segs.every((s) => s.startsWith("col:"))
+  );
 }
 
 /** Pretty path: strip the "col:" leaf prefix, join the hierarchy with " › ". */
@@ -57,6 +67,46 @@ export function renderReadout(report: BucketsReport): string {
     out.push(`| --- | :---: | ---: |`);
     for (const e of entries) {
       out.push(`| ${displayLabel(e.label)} | ${isUntagged(e.label) ? "—" : "✓"} | ${fmt(e.reads)} |`);
+    }
+  }
+
+  // WHO — the identity cross-match. Present ONLY when an actor was set (a customer's
+  // own `setActor`, or the Crossdeck SDK). Two distinct axes, never merged: who caused
+  // the reads, and who × which function. A machine read has no person but still its
+  // tenant, so it shows as an actor here too (`machine`), keeping background work
+  // attributable to a customer while honestly carrying no human.
+  const actors = Object.entries(report.byActor ?? {})
+    .map(([actor, c]) => ({ actor, reads: (c as ResourceCounts).read ?? 0 }))
+    .filter((e) => e.reads > 0)
+    .sort((a, b) => b.reads - a.reads);
+  if (actors.length > 0) {
+    out.push(``);
+    out.push(`## Who caused the reads`);
+    out.push(``);
+    out.push(`| user | reads |`);
+    out.push(`| --- | ---: |`);
+    for (const e of actors) out.push(`| ${e.actor} | ${fmt(e.reads)} |`);
+  }
+
+  const cross = Object.entries(report.byActorLabel ?? {})
+    .map(([key, c]) => {
+      const i = key.indexOf(ACTOR_SEP);
+      return {
+        actor: i >= 0 ? key.slice(0, i) : key,
+        label: i >= 0 ? key.slice(i + ACTOR_SEP.length) : "",
+        reads: (c as ResourceCounts).read ?? 0,
+      };
+    })
+    .filter((e) => e.reads > 0)
+    .sort((a, b) => b.reads - a.reads);
+  if (cross.length > 0) {
+    out.push(``);
+    out.push(`## Who × what — which user's which function`);
+    out.push(``);
+    out.push(`| user | function | reads |`);
+    out.push(`| --- | --- | ---: |`);
+    for (const e of cross) {
+      out.push(`| ${e.actor} | ${displayLabel(e.label)} | ${fmt(e.reads)} |`);
     }
   }
 

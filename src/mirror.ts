@@ -1,7 +1,7 @@
 /**
- * mirror — tees every coalesced report to a local file so "read me my buckets" works
- * offline, free, with no account. Writes a human/AI-readable readout
- * (`.crossdeck/buckets.md`) plus the raw report (`.crossdeck/buckets.json`).
+ * mirror — tees every coalesced report to a local file so the readout works offline,
+ * free, with no account. Writes a markdown readout (`.crossdeck/buckets.md`, what
+ * `npx @cross-deck/buckets` prints) plus the raw report (`.crossdeck/buckets.json`).
  *
  * NODE ONLY — never imported by the browser build (it touches the filesystem).
  *
@@ -19,8 +19,10 @@ import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Sink, BucketsReport, ResourceCounts } from "./sink";
 import { renderReadout } from "./readout";
+import { DEFAULT_MIRROR_DIR } from "./constants";
 
-export const DEFAULT_MIRROR_DIR = ".crossdeck";
+// Re-export so existing `import { DEFAULT_MIRROR_DIR } from "./mirror"` keeps working.
+export { DEFAULT_MIRROR_DIR } from "./constants";
 
 function mergeInto(target: Record<string, ResourceCounts>, src?: Record<string, ResourceCounts>): void {
   if (!src) return;
@@ -83,7 +85,7 @@ export class MirrorSink implements Sink {
         // One quiet line, once, so a developer knows where to read it back.
         // eslint-disable-next-line no-console
         console.log(
-          `Buckets: readout at ${join(this.dir, "buckets.md")} — open it, or ask your AI session to "read me my buckets".`,
+          `Buckets: readout at ${join(this.dir, "buckets.md")} — open it, or run \`npx @cross-deck/buckets\`.`,
         );
       }
     } catch {

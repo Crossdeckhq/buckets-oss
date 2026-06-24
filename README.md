@@ -167,6 +167,23 @@ import { setActor } from "@cross-deck/buckets";
 setActor(req.user.id);
 ```
 
+> **Async handler? Use `withActor`.** `setActor` is perfect in synchronous
+> middleware (Express, Koa) where you set it and call the next handler in the same
+> tick. But in an **async** handler — a Firebase / Cloud Function, a tRPC resolver,
+> anything that `await`s between *knowing the user* and *issuing the reads* — wrap
+> the work instead, so the actor reliably covers every awaited read:
+> ```ts
+> import { withActor } from "@cross-deck/buckets";
+>
+> await withActor(req.user.id, async () => {
+>   // every read in here — and in everything it awaits — attributes to this user
+>   return handle(req);
+> });
+> ```
+> `withActor` scopes the actor to exactly that call via `AsyncLocalStorage.run`; a
+> bare `setActor` can be lost across an `await`, silently under-attributing. (If you
+> use the `@cross-deck/node` Express/Lambda adapters, this is wired for you.)
+
 That's the whole wiring. The **function** is captured where the read runs; the **user**
 from that one line. Run `npx @cross-deck/buckets` and the readout gains two sections:
 
@@ -719,6 +736,7 @@ init({ apiKey, endpoint?, flushIntervalMs? })   // configure once; reports up to
 
 bucket(name, fn)               // ← the one verb you'll use: attribute everything inside to `name`
 setActor(userId)               // WHO — attribute reads to the user you already have in session
+withActor(userId, fn)          // WHO, async-safe — wrap a handler so awaited reads keep the user
 withBuckets(handler)           // wrap a serverless handler — flush its counts before the freeze
 withBuckets(name, handler)     // …and attribute the whole invocation to `name`
 

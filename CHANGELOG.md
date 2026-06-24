@@ -2,6 +2,17 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.15.1] — 2026-06-24
+
+### Docs
+- **Document `withActor(id, fn)` — the async-safe WHO wrapper — next to `setActor`.**
+  `setActor` (which uses `enterWith`) is perfect in synchronous middleware but can be
+  lost across an `await` in an async handler (Firebase / Cloud Functions, tRPC
+  resolvers), silently under-attributing the reads. `withActor` scopes the actor to
+  exactly that call via `AsyncLocalStorage.run`, so every awaited read keeps the user.
+  Added the callout to the cross-match section and the export to the API reference.
+  (Both already shipped in 0.14.0 — this surfaces the safer one.)
+
 ## [0.15.0] — 2026-06-24
 
 ### Added

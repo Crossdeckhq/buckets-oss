@@ -101,6 +101,33 @@ and read-spike alerts. (Set `mirror: false` to turn the local file off.)
 
 ---
 
+## Serverless — wrap your handlers (or counts vanish on freeze)
+
+Serverless platforms **freeze your container the instant a handler finishes** — to save you money they stop the CPU the moment there's no work. Buckets counts in memory and ships on a short timer; on a frozen container that timer never fires, so the operations you just ran are **billed by your datastore but missing from your dashboard.** It's worst exactly when traffic is sparse (overnight, low-volume endpoints), and it under-reports — making a bill look *smaller* than it is.
+
+The fix is one line: wrap each serverless entry point with **`withBuckets`**. It flushes the counts in a `finally`, before the handler returns — using the split-second of CPU you've **already paid for** on that invocation. Nothing is kept awake; there is **no added cost.**
+
+```ts
+import { withBuckets } from "@cross-deck/buckets";
+
+// before — counts can vanish when the container freezes:
+export const handler = async (event) => { /* …db reads… */ };
+
+// after — every invocation's counts ship before the freeze:
+export const handler = withBuckets(async (event) => { /* …db reads… */ });
+
+// optionally attribute the whole invocation to one bucket:
+export const handler = withBuckets("nightly-export", async (event) => { /* … */ });
+```
+
+**This is adapter-agnostic.** `withBuckets` flushes the *meter*, not any one database — so a single wrap covers **every** adapter you've installed at once (Firestore, MongoDB, Postgres, …). You don't wrap per-datastore; you wrap per-handler.
+
+Reach for it at **every** serverless entry point — HTTP and callable functions, queue/stream consumers, scheduled jobs, database triggers (AWS Lambda, Google Cloud Functions / Cloud Run, Vercel, Cloudflare Workers, …). On an always-on process (a long-running container or classic Node server) you don't need it — the timer ships your counts.
+
+> **If you skip this on serverless, your numbers under-report on quiet traffic.** It's the one integration step that makes "catch ~99% of your reads" hold on infrastructure that sleeps — the same way calling the SDK in your handler is what makes any tool work. We can't run it for you; we make it one line and tell you plainly.
+
+---
+
 ## Server *and* browser — install where you read
 
 A collector counts reads **where it runs.** With Firestore, your app often reads

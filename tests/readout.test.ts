@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { renderReadout, READOUT_FOOTER } from "../src/readout";
+import { renderReadout, READOUT_FOOTER, isReadUnit } from "../src/readout";
+import { ACTOR_SEP } from "../src/constants";
 import { MirrorSink } from "../src/mirror";
 import type { BucketsReport } from "../src/sink";
 
@@ -91,5 +92,93 @@ describe("MirrorSink", () => {
     await sink.flush(report({ "col:events": { read: 7 } }));
     expect(seen).toHaveLength(1);
     expect(seen[0].byLabel["col:events"].read).toBe(7);
+  });
+});
+
+/**
+ * Regression — buckets-oss#14, reported by @codeCraft-Ritik.
+ *
+ * `renderReadout` read `counts.read` directly, so an adapter whose raw unit is
+ * not literally `read` rendered 0 and the readout claimed "No reads metered
+ * yet". Both SHIPPED non-Firestore adapters are in that position:
+ * Mongo counts `mongo.docs_read`, Postgres counts `postgres.rows_read`.
+ */
+describe("readout — resolves each adapter's raw read unit (#14)", () => {
+  const MONGO = "mongo.docs_read";
+  const PG = "postgres.rows_read";
+
+  it("counts MongoDB reads (mongo.docs_read)", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "col:users": { [MONGO]: 1200 } },
+    } as never);
+    expect(md).toContain("1.2K reads");
+    expect(md).not.toContain("No reads metered yet");
+  });
+
+  it("counts Postgres reads (postgres.rows_read)", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "GET /invoices": { [PG]: 900 } },
+    } as never);
+    expect(md).toContain("900 reads");
+    expect(md).not.toContain("No reads metered yet");
+  });
+
+  it("sums across mixed adapters and names the units", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { a: { [MONGO]: 100 }, b: { [PG]: 50 }, c: { read: 25 } },
+    } as never);
+    expect(md).toContain("175 reads");
+    expect(md).toContain("Across 3 read units");
+    expect(md).toContain(MONGO);
+  });
+
+  it("still counts the plain Firestore `read` unit", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "col:orders": { read: 42 } },
+    } as never);
+    expect(md).toContain("42 reads");
+  });
+
+  it("never counts writes or deletes as reads", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "col:orders": { write: 500, delete: 300 } },
+    } as never);
+    expect(md).toContain("No reads metered yet");
+    expect(md).toContain("**0 reads**");
+  });
+
+  it("resolves the unit in the actor and actor×label tables too", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "col:users": { [MONGO]: 10 } },
+      byActor: { "user_7": { [MONGO]: 10 } },
+      byActorLabel: { [`user_7${ACTOR_SEP}col:users`]: { [MONGO]: 10 } },
+    } as never);
+    expect(md).toContain("Who caused the reads");
+    expect(md).toContain("user_7");
+    expect(md).toContain("Who × what");
+  });
+
+  it("SHOWS an unrecognised unit instead of silently dropping it", () => {
+    const md = renderReadout({
+      date: "2026-08-29",
+      byLabel: { "col:blobs": { "s3.bytes_egress": 999 } },
+    } as never);
+    expect(md).toContain("unrecognised unit");
+    expect(md).toContain("s3.bytes_egress");
+  });
+
+  it("isReadUnit classifies the shipped units correctly", () => {
+    expect(isReadUnit("read")).toBe(true);
+    expect(isReadUnit(MONGO)).toBe(true);
+    expect(isReadUnit(PG)).toBe(true);
+    expect(isReadUnit("write")).toBe(false);
+    expect(isReadUnit("delete")).toBe(false);
+    expect(isReadUnit("s3.bytes_egress")).toBe(false);
   });
 });

@@ -46,19 +46,114 @@ function displayLabel(label: string): string {
     .join(" › ");
 }
 
+/**
+ * Units the generic recorders emit that are NOT reads. Everything a read meter
+ * emits is a read unit; these two are the only writes in the model.
+ */
+const NON_READ_UNITS = new Set(["write", "delete"]);
+
+/**
+ * Is this resource unit a READ unit?
+ *
+ * Adapters name their raw unit honestly rather than flattening everything to
+ * `read` — Firestore counts `read`, Mongo counts `mongo.docs_read`, Postgres
+ * counts `postgres.rows_read` — because the units are genuinely different work
+ * and {@link ResourceCounts} keeps them "distinct, never merged".
+ *
+ * The readout must therefore RESOLVE the unit rather than assume `read`.
+ * Anything ending in `read`/`reads`, on a `.` or `_` boundary, is a read unit.
+ */
+export function isReadUnit(unit: string): boolean {
+  if (NON_READ_UNITS.has(unit)) return false;
+  return /(?:^|[._])reads?$/.test(unit);
+}
+
+/**
+ * Total reads in one bucket, summed across EVERY read unit present.
+ *
+ * Pre-fix this read `counts.read` directly, so an adapter whose raw unit is not
+ * literally `read` — Mongo and Postgres, both shipped — rendered 0 and the
+ * readout claimed "No reads metered yet" while the data sat right there.
+ * Reported by @codeCraft-Ritik (buckets-oss#14).
+ */
+export function readsIn(counts: ResourceCounts | undefined): number {
+  if (!counts) return 0;
+  let total = 0;
+  for (const [unit, n] of Object.entries(counts)) {
+    if (typeof n === "number" && isReadUnit(unit)) total += n;
+  }
+  return total;
+}
+
+/**
+ * Read units that carried traffic, in the order they contributed most — so a
+ * mixed-adapter surface can say WHICH reads it is totalling instead of merging
+ * two different kinds of work into one anonymous number.
+ */
+function readUnitsPresent(report: BucketsReport): string[] {
+  const totals = new Map<string, number>();
+  for (const counts of Object.values(report.byLabel ?? {})) {
+    for (const [unit, n] of Object.entries((counts ?? {}) as ResourceCounts)) {
+      if (typeof n === "number" && n > 0 && isReadUnit(unit)) {
+        totals.set(unit, (totals.get(unit) ?? 0) + n);
+      }
+    }
+  }
+  return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([u]) => u);
+}
+
+/**
+ * Units that are neither a read nor a known write — i.e. a unit this renderer
+ * does not understand. Surfaced in the readout rather than silently dropped,
+ * because silently dropping an unrecognised unit is precisely the defect
+ * buckets-oss#14 reported: metered data that renders as "nothing here".
+ */
+function unrecognisedUnits(report: BucketsReport): string[] {
+  const seen = new Set<string>();
+  for (const counts of Object.values(report.byLabel ?? {})) {
+    for (const [unit, n] of Object.entries((counts ?? {}) as ResourceCounts)) {
+      if (typeof n === "number" && n > 0 && !isReadUnit(unit) && !NON_READ_UNITS.has(unit)) {
+        seen.add(unit);
+      }
+    }
+  }
+  return [...seen].sort();
+}
+
 /** Render the day's coalesced report as a human/AI-readable markdown readout. */
 export function renderReadout(report: BucketsReport): string {
   const entries = Object.entries(report.byLabel ?? {})
-    .map(([label, counts]) => ({ label, reads: (counts as ResourceCounts).read ?? 0 }))
+    .map(([label, counts]) => ({ label, reads: readsIn(counts as ResourceCounts) }))
     .filter((e) => e.reads > 0)
     .sort((a, b) => b.reads - a.reads);
 
   const total = entries.reduce((s, e) => s + e.reads, 0);
+  const units = readUnitsPresent(report);
+  const unknown = unrecognisedUnits(report);
   const out: string[] = [];
   out.push(`# Buckets — reads on this surface`);
   out.push(``);
   out.push(`**${fmt(total)} reads** · ${report.date} (UTC)`);
+  // Name the units when more than one meter is installed. Two adapters count
+  // genuinely different work (documents vs rows), and the model keeps them
+  // distinct — so say which reads this total is made of rather than merging
+  // them into one anonymous number.
+  if (units.length > 1) {
+    out.push(``);
+    out.push(`_Across ${units.length} read units: ${units.join(", ")}._`);
+  }
   out.push(``);
+
+  // A unit this renderer doesn't understand is SHOWN, never dropped. Silently
+  // discarding metered data is the defect buckets-oss#14 reported — the readout
+  // said "nothing here" while the reads existed. It can't happen quietly again.
+  if (unknown.length > 0) {
+    out.push(
+      `> ⚠️ Metered but not shown — unrecognised unit(s): ${unknown.join(", ")}. ` +
+        `Please report this at https://github.com/Crossdeckhq/buckets-oss/issues so the readout can count them.`,
+    );
+    out.push(``);
+  }
 
   if (entries.length === 0) {
     out.push(`No reads metered yet — install the collector and let your app serve some traffic.`);
@@ -76,7 +171,7 @@ export function renderReadout(report: BucketsReport): string {
   // tenant, so it shows as an actor here too (`machine`), keeping background work
   // attributable to a customer while honestly carrying no human.
   const actors = Object.entries(report.byActor ?? {})
-    .map(([actor, c]) => ({ actor, reads: (c as ResourceCounts).read ?? 0 }))
+    .map(([actor, c]) => ({ actor, reads: readsIn(c as ResourceCounts) }))
     .filter((e) => e.reads > 0)
     .sort((a, b) => b.reads - a.reads);
   if (actors.length > 0) {
@@ -94,7 +189,7 @@ export function renderReadout(report: BucketsReport): string {
       return {
         actor: i >= 0 ? key.slice(0, i) : key,
         label: i >= 0 ? key.slice(i + ACTOR_SEP.length) : "",
-        reads: (c as ResourceCounts).read ?? 0,
+        reads: readsIn(c as ResourceCounts),
       };
     })
     .filter((e) => e.reads > 0)

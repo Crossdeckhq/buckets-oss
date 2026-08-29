@@ -2,6 +2,32 @@
 
 All notable changes to `@cross-deck/buckets`. Format: [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.15.3] — 2026-08-29
+
+### Fixed
+- **The readout dropped every read from the MongoDB and PostgreSQL meters, always showing "No reads metered yet".**
+  Reported — with a complete root-cause analysis, down to the line — by **[@codeCraft-Ritik](https://github.com/codeCraft-Ritik)** in [#14](https://github.com/Crossdeckhq/buckets-oss/issues/14). Thank you.
+
+  `renderReadout` read `counts.read` directly. Adapters deliberately name their raw unit
+  honestly instead of flattening everything to `read` — Firestore counts `read`, Mongo counts
+  `mongo.docs_read`, Postgres counts `postgres.rows_read` — because they are genuinely
+  different work, and `ResourceCounts` keeps them "distinct, never merged". The renderer
+  never resolved the unit, so **two of the three shipped adapters metered perfectly and then
+  rendered zero**, while the empty state told the developer to go and install the collector
+  they had already installed correctly.
+
+  The readout now resolves each adapter's read unit (`readsIn()` / `isReadUnit()`, both
+  exported) in all three tables — buckets, actors, and actor×function. The original report
+  identified the bucket table; the same hardcode was present in the other two.
+
+### Added
+- **Mixed-adapter surfaces name their units.** With more than one meter installed the total is
+  annotated — *"Across 2 read units: mongo.docs_read, postgres.rows_read"* — rather than
+  silently merging two different kinds of work into one anonymous number.
+- **An unrecognised unit is now shown, never dropped.** If a report carries a unit the renderer
+  doesn't understand, the readout says so and links to the issue tracker. Silently discarding
+  metered data is exactly what #14 was; it can no longer happen quietly.
+
 ## [0.15.2] — 2026-06-24
 
 ### Docs

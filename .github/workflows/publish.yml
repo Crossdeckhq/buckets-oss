@@ -33,7 +33,10 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
       # Trusted publishing requires a recent npm (>= 11.5.1); Node 20 ships npm 10.
-      - run: npm install -g npm@latest
+      # Pin to the 11.x line — npm@latest is now 12.x, which requires
+      # Node >= 22 and hard-fails EBADENGINE on this Node 20 runner.
+      # npm 11 runs on Node 20 and satisfies trusted publishing.
+      - run: npm install -g npm@^11
       - run: npm ci
       - run: npm run build
       - run: npm test

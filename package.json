@@ -56,7 +56,7 @@
     "type": "git",
     "url": "git+https://github.com/Crossdeckhq/buckets-oss.git"
   },
-  "homepage": "https://github.com/Crossdeckhq/buckets-oss#readme",
+  "homepage": "https://cross-deck.com/docs/buckets/",
   "bugs": {
     "url": "https://github.com/Crossdeckhq/buckets-oss/issues"
   },
